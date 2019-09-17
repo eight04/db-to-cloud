@@ -38,7 +38,7 @@ function buildDrive(drive) {
     post: async (path, data) => await drive.post(path, JSON.stringify(data)),
     delete: drive.delete.bind(drive),
     acquireLock: drive.acquireLock ? drive.acquireLock.bind(drive) : acquireLock,
-    releaseLock: drive.releaseLock ? drive.releaseLock.bind(drive) : releaseLock
+    releaseLock: drive.acquireLock ? drive.releaseLock.bind(drive) : releaseLock
   };
   
   async function acquireLock(expire) {
