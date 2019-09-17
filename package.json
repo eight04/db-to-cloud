@@ -1,0 +1,37 @@
+{
+  "name": "db-to-cloud",
+  "version": "0.0.0",
+  "description": "Synchronize your database with a cloud drive i.e. Dropbox, Google Drive, OneDrive, Github, etc.",
+  "author": "eight04 <eight04@gmail.com>",
+  "license": "MIT",
+  "keywords": [
+    "github",
+    "google drive",
+    "dropbox",
+    "onedrive"
+  ],
+  "scripts": {
+    "lint": "eslint **/*.js --cache",
+    "nyc": "nyc --reporter=html mocha",
+    "test": "npm run lint && c8 --reporter=lcov mocha",
+    "preversion": "npm test",
+    "postversion": "git push --follow-tags && npm publish"
+  },
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "c8": "^5.0.4",
+    "eslint": "^6.1.0",
+    "mocha": "^6.2.0"
+  },
+  "repository": "eight04/db-to-cloud",
+  "eslintIgnore": [
+    "coverage"
+  ],
+  "engines": {
+    "node": ">=8"
+  },
+  "files": [
+    "drive"
+  ]
+}
