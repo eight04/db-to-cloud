@@ -5,10 +5,10 @@ Synchronize your database with a cloud drive i.e. Dropbox, Google Drive, OneDriv
 
 To use this library, add following properties to the document:
 
-* `_id` - a unique ID. Two objects are treated as the same document when they have the same ID. This is usually a UUID. The ID should be a valid filename.
-* `_rev` - a revision tag. If two objects have the same `_id` but different `_rev`, the cloud need to decide which should be kept and saved. For a simple use case, you can use a timestamp as the revision tag and always keep the latest object.
+* A unique ID. `Number` or `String`. Two objects are treated as the same document when they have the same ID. This is usually a UUID. The ID must be a valid filename.
+* A revision tag. `Number` or `String`. If two objects have the same ID but different revision, the cloud needs to decide which should be kept and saved. For a simple use case, you can use a timestamp as the revision tag and always keep the latest object.
 
-These properties should be a primitive value i.e. string or number.
+> In CouchDB, these properties are `_id` and `_rev`. We also uses these names in the code example.
 
 Installation
 ------------
@@ -31,13 +31,12 @@ npm install db-to-cloud
 Usage
 -----
 
-*Setup*
+### Setup
 
 ```js
 const {dbToCloud, drive: {google}} = require("db-to-cloud");
 
 const sync = dbToCloud({
-  // hooks to handle cloud update, communicate with the local DB
   async onGet(id) {
     return await myDB.get(id);
   },
@@ -48,7 +47,7 @@ const sync = dbToCloud({
     } catch (err) {
       if (err.type === 'outdatedDoc') {
         // the doc in the local DB is newer than the doc in the cloud
-        sync.put(doc._id);
+        sync.put(doc._id, err.doc._rev);
       }
     }
   },
@@ -58,22 +57,20 @@ const sync = dbToCloud({
     } catch (err) {}
   },
   
-  // hooks to handle the first sync
   async onFirstSync() {
     const cursor = myDB.getAllCursor();
     while (!cursor.end()) {
-      sync.put(await cursor.next());
+      const {_id, _rev} = await cursor.next();
+      sync.put(_id, _rev);
     }
   },
   
-  // hooks to resolve _rev conflict
-  compareRevision(doc1, doc2) {
+  compareRevision(rev1, rev2) {
     // if we use the timestamp as the revision tag, we can use a simple way to
     // decide which wins
-    return doc1._rev - doc2._rev;
+    return rev1 - rev2;
   },
   
-  // hooks to store metadata about the sync progress
   async getState(drive) {
     try {
       return JSON.parse(localStorage.getItem(`cloudSync/${drive.name}/state`));
@@ -83,7 +80,6 @@ const sync = dbToCloud({
     localStorage.setItem(`cloudSync/${drive.name}/state`, JSON.stringify(state));
   },
   
-  // hooks to collect errors
   onError(err) {
     console.error(err);
   }
@@ -108,23 +104,24 @@ try {
 }
 ```
 
-*In the application*
+### Update the cloud when manipulating the database
 
 ```js
 // push the change to the cloud when manipulating on the local DB
-doc = await myDB.post(doc);
-sync.put(doc._id);
+const {_id, _rev} = await myDB.post(doc);
+sync.put(_id, _rev);
+
 // note that there is no sync.post. Technically, all documents already have an
-// id before sent to cloud.
+// id before sent to the cloud.
 
-doc = await myDB.put(doc);
-sync.put(doc._id);
+const {_id, _rev} = await myDB.put(doc);
+sync.put(_id, _rev);
 
-await myDB.delete(id);
-sync.delete(id);
+const {_rev} = await myDB.delete(_id);
+sync.delete(_id, _rev);
 ```
 
-*Switch to a different drive*
+### Switch to a different drive
 
 ```js
 await sync.stop();
@@ -145,7 +142,59 @@ sync.start();
 API
 ----
 
+### dbToCloud
+
+```js
+dbToCloud({
+  onGet: async (id, rev) => Document,
+  onPut: async (document) => void,
+  onDelete: async (id, rev) => void,
+  
+  onError: async (error) => void,
+  
+  onFirstSync: async () => void,
+  
+  compareRevision: (revision1, revision2) => cmpResult: Number,
+  
+  getState: async (drive) => state: Object,
+  setState: async (drive, state) => void
+  
+  period?: Number,
+  lockExpire?: Number
+}) => sync: SyncController
+```
+
+Create a sync controller. [Usage example](#setup).
+
+`onGet` accept a revision tag. However, you can ignore it and return/delete the latest one since it isn't useful to store outdated document in the cloud.
+
+`onDelete` also accept a revision tag. You can use it to decide if the deletion take place or should be ignored.
+
+Use `onError` to collect sync errors. You may want to show an error log to the user.
+
+`onFirstSync` is called on the first sync. You can push all local documents to the cloud in this hook.
+
+`compareRevision` is used to decide which revision should be kept. If `cmpResult > 0` then `revision1` wins. If `cmpResult < 0` then `revision2` wins.
+
+`getState` and `setState` are used to get/store the current state of the sync process. You should save the state object to a file or `localStorage`. If `getState` returns `undefined` then it is the first sync. `drive` is a cloud drive adapter instance. You can get the drive name from `drive.name`.
+
+`period` decides the sync interval. In minutes. Default: `5`.
+
+When syncing, the controller will lock the cloud drive. However, if the process is interrupted (e.g. crashed) and failed to unlock, the lock will expire after `lockExpire` minutes. Default: `60`.
+
+### sync.use
+
+```js
+sync.use(cloud) => void
+```
+
+Use a cloud adapter. The cloud is not initialized until calling `sync.start()`.
+
 ### sync.start
+
+```js
+async sync.start() => void
+```
 
 Start syncing.
 
@@ -153,14 +202,15 @@ Without calling this function, sending items to `sync.put`, `sync.delete`, etc, 
 
 After calling this method:
 
-1. Start collecting local changes.
+1. Initialize the cloud.
 2. Load the current state.
-3. Setup a timer which will pull remote changes from the drive and push local changes to the drive.
+3. Start collecting local changes.
+4. Setup a timer which will pull remote changes from the drive and push local changes to the drive.
 
 ### sync.stop
 
 ```js
-await sync.stop();
+async sync.stop() => void
 ```
 
 Stop syncing.
@@ -168,9 +218,26 @@ Stop syncing.
 After calling this method:
 
 1. Stop collecting local changes.
-2. Remove the sync task timer.
+2. Remove the timer of the sync process.
 3. Wait until all running sync task complete.
-4. Save the current state.
+4. Uninitialize the cloud.
+5. Save the current state.
+
+### sync.put
+
+```js
+sync.put(id, revision) => void
+```
+
+Add a "put action" to the history queue.
+
+### sync.delete
+
+```js
+sync.delete(id, revision) => void
+```
+
+Add a "delete action" to the history queue.
 
 Create a cloud drive adapter
 ----------------------------
@@ -231,7 +298,7 @@ Delete a file. If the path doesn't exist, this function does nothing.
 async drive.list(path: String) => Array<filename: String>
 ```
 
-List all documents in the folder. This is used on the first sync since we have to fetch all documents from the drive.
+List all files in the folder. This is used on the first sync since we have to fetch all documents from the drive.
 
 Currently, only the `docs` folder will be requested.
 

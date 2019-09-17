@@ -76,7 +76,8 @@ function dbToCloud({
   let timer;
   let state;
   let currentTask;
-  const saveState = debounced(() => setState(state));
+  const saveState = debounced(() => setState(drive, state));
+  const revisionCache = new Map;
   return {use, start, stop, put, delete: delete_};
   
   function use(newDrive) {
@@ -119,7 +120,8 @@ function dbToCloud({
     let changes = [];
     if (!state.lastChange) {
       // pull everything
-      changes = (await drive.list("docs")).map(name => ['put', name.slice(0, -5)]);
+      changes = (await drive.list("docs"))
+        .map(name => ({action: 'put', _id: name.slice(0, -5)}));
     } else {
       const end = Math.floor((meta.lastChange - 1) / 100); // inclusive end
       let i = Math.floor(state.lastChange / 100);
@@ -131,13 +133,13 @@ function dbToCloud({
     }
     // merge changes
     const idx = new Map;
-    for (const [id, action] of changes) {
-      idx.set(id, action);
+    for (const change of changes) {
+      idx.set(change._id, change);
     }
-    for (const [id, action] of idx) {
-      if (action === "delete") {
-        await onDelete(id);
-      } else if (action === "put") {
+    for (const [id, change] of idx) {
+      if (change.action === "delete") {
+        await onDelete(id, change._rev);
+      } else if (change.action === "put") {
         let doc;
         try {
           doc = await cache.get(`docs/${id}.json`);
@@ -150,6 +152,8 @@ function dbToCloud({
         }
         await onPut(doc);
       }
+      // record the remote revision
+      revisionCache.set(id, change._rev);
     }
     state.lastChange = meta.lastChange;
     await saveState();
@@ -166,46 +170,28 @@ function dbToCloud({
     
     // merge changes
     const idx = new Map;
-    for (const [id, action] of changes) {
-      idx.set(id, action);
+    for (const change of changes) {
+      idx.set(change._id, change);
     }
-    const toPut = [];
-    const toDelete = [];
-    for (const [id, action] of idx.entries()) {
-      if (action === "delete") {
-        toDelete.push(id);
-      } else if (action === "put") {
-        toPut.push(id);
-      }
-    }
-    
-    // put
-    for (const id of toPut) {
-      const doc = await onGet(id);
-      const meta = cache.has(`docs/${id}.json`) && await cache.get(`docs/${id}.json`);
-      if (meta && compareRevision(doc, meta) <= 0) {
+    const newChanges = [];
+    for (const [id, change] of idx.entries()) {
+      // FIXME: is it safe to assume that the local doc is newer when
+      // remoteRev is undefined?
+      const remoteRev = revisionCache.get(change._id);
+      if (remoteRev !== undefined && compareRevision(change._rev, remoteRev) <= 0) {
         continue;
       }
-      await drive.put(`docs/${id}.json`, doc);
-    }
-    
-    // delete
-    for (const id of toDelete) {
-      await drive.delete(`docs/${id}.json`);
+      if (change.action === "delete") {
+        await drive.delete(`docs/${id}.json`);
+      } else if (change.action === "put") {
+        await drive.put(`docs/${id}.json`, await onGet(id, change._rev));
+      }
+      revisionCache.set(id, change._rev);
+      newChanges.push(change);
     }
     
     // update changes/meta
-    const newChanges = [];
-    for (const id of toPut) {
-      newChanges.push(['put', id]);
-    }
-    for (const id of toDelete) {
-      newChanges.push(['delete', id]);
-    }
-    
     const meta = await cache.get("changes/meta.json", {lastChange: 0});
-    
-    // NOTE: always runs syncPush after syncPull
     const index = Math.floor(meta.lastChange / 100);
     const len = meta.lastChange % 100;
     let lastChanges = await cache.get("changes/${index}.json", []);
@@ -241,18 +227,22 @@ function dbToCloud({
     }
   }
   
-  function put(id) {
+  function put(_id, _rev) {
     if (!state || !state.enabled) {
       return;
     }
-    state.queue.push([id, "put"]);
+    state.queue.push({
+      _id, _rev, action: "put"
+    });
   }
   
-  function delete_(id) {
+  function delete_(_id, _rev) {
     if (!state || !state.enabled) {
       return;
     }
-    state.queue.push([id, "delete"]);
+    state.queue.push({
+      _id, _rev, action: "delete"
+    });
   }
   
   function buildCache() {

@@ -4,7 +4,15 @@ function createDrive({
 }) {
   let fs;
   let path;
-  return {init, get, put, post, delete: delete_, list};
+  return {
+    name: "fs-drive",
+    init,
+    get,
+    put,
+    post,
+    delete: delete_,
+    list
+  };
   
   async function init() {
     [fs, path] = await Promise.resolve([
