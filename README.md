@@ -5,7 +5,7 @@ Synchronize your database with a cloud drive i.e. Dropbox, Google Drive, OneDriv
 
 To use this library, add following properties to the document:
 
-* `_id` - a unique ID. Two objects are treated as the same document when they have the same ID. This is usually a UUID.
+* `_id` - a unique ID. Two objects are treated as the same document when they have the same ID. This is usually a UUID. The ID should be a valid filename.
 * `_rev` - a revision tag. If two objects have the same `_id` but different `_rev`, the cloud need to decide which should be kept and saved. For a simple use case, you can use a timestamp as the revision tag and always keep the latest object.
 
 These properties should be a primitive value i.e. string or number.
@@ -224,6 +224,18 @@ async drive.delete(path: String) => void
 ```
 
 Delete a file. If the path doesn't exist, this function does nothing.
+
+### list
+
+```js
+async drive.list(path: String) => Array<filename: String>
+```
+
+List all documents in the folder. This is used on the first sync since we have to fetch all documents from the drive.
+
+Currently, only the `docs` folder will be requested.
+
+If the path doesn't exist, it can throw an ENOENT error or return an empty array.
 
 ### acquireLock, releaseLock
 

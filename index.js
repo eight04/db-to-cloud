@@ -119,7 +119,7 @@ function dbToCloud({
     let changes = [];
     if (!state.lastChange) {
       // pull everything
-      changes = (await cache.get("list.json")).map(id => ['put', id]);
+      changes = (await drive.list("docs")).map(name => ['put', name.slice(0, -5)]);
     } else {
       const end = Math.floor((meta.lastChange - 1) / 100); // inclusive end
       let i = Math.floor(state.lastChange / 100);
@@ -138,7 +138,16 @@ function dbToCloud({
       if (action === "delete") {
         await onDelete(id);
       } else if (action === "put") {
-        const doc = await cache.get(`docs/${id}.json`);
+        let doc;
+        try {
+          doc = await cache.get(`docs/${id}.json`);
+        } catch (err) {
+          if (err.code === "ENOENT") {
+            await onError(new Error(`Cannot find ${id}. Is it deleted without updating the history?`));
+            continue;
+          }
+          throw err;
+        }
         await onPut(doc);
       }
     }
@@ -180,7 +189,12 @@ function dbToCloud({
       await drive.put(`docs/${id}.json`, doc);
     }
     
-    // update changes
+    // delete
+    for (const id of toDelete) {
+      await drive.delete(`docs/${id}.json`);
+    }
+    
+    // update changes/meta
     const newChanges = [];
     for (const id of toPut) {
       newChanges.push(['put', id]);
@@ -204,11 +218,6 @@ function dbToCloud({
     }
     meta.lastChange += newChanges.length;
     await drive.put("changes/meta.json", meta);
-    
-    // delete
-    for (const id of toDelete) {
-      await drive.delete(`docs/${id}.json`);
-    }
     
     state.queue = state.queue.slice(changes.length);
     state.lastChange = meta.lastChange;

@@ -4,13 +4,17 @@ function createDrive({
 }) {
   let fs;
   let path;
-  return {init, get, put, post, delete: delete_};
+  return {init, get, put, post, delete: delete_, list};
   
   async function init() {
     [fs, path] = await Promise.resolve([
       getFs(),
       Promise.resolve(require("path"))
     ]);
+  }
+  
+  async function list(file) {
+    return await fs.readdir(path.join(folder, file));
   }
   
   async function get(file) {
