@@ -2,7 +2,7 @@ function debounce(fn) {
   let timer = 0;
   let q;
   return () => {
-    if (!timer) {
+    if (timer) {
       clearTimeout(timer);
     }
     timer = setTimeout(run);
@@ -56,6 +56,8 @@ function dbToCloud({
     if (!drive) {
       throw new Error("cloud drive is undefined");
     }
+    await drive.init();
+    
     state = await getState(drive) || {};
     state.enabled = true;
     if (state.lastChange == null) {
