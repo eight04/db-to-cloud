@@ -1,4 +1,4 @@
-function debounce(fn) {
+function debounced(fn) {
   let timer = 0;
   let q;
   return () => {
@@ -29,6 +29,37 @@ function debounce(fn) {
   }
 }
 
+function buildDrive(drive) {
+  return {
+    init: drive.init && drive.init.bind(drive),
+    uninit: drive.uninit && drive.uninit.bind(drive),
+    get: async path => JSON.parse(await drive.get(path)),
+    put: async (path, data) => await drive.put(path, JSON.stringify(data)),
+    post: async (path, data) => await drive.post(path, JSON.stringify(data)),
+    delete: drive.delete.bind(drive),
+    acquireLock: drive.acquireLock ? drive.acquireLock.bind(drive) : acquireLock,
+    releaseLock: drive.releaseLock ? drive.releaseLock.bind(drive) : releaseLock
+  };
+  
+  async function acquireLock(expire) {
+    try {
+      await this.post("lock.json", {expire: Date.now() + expire * 60 * 1000});
+    } catch (err) {
+      if (err.code === "EEXIST") {
+        const data = await this.get("lock.json");
+        if (Date.now() > data.expire) {
+          await this.delete("lock.json");
+        }
+      }
+      throw err;
+    }
+  }
+  
+  async function releaseLock() {
+    await this.delete("lock.json");
+  }
+}
+
 function dbToCloud({
   onGet,
   onPut,
@@ -45,18 +76,20 @@ function dbToCloud({
   let timer;
   let state;
   let currentTask;
-  const saveState = debounce(() => setState(state));
+  const saveState = debounced(() => setState(state));
   return {use, start, stop, put, delete: delete_};
   
   function use(newDrive) {
-    drive = newDrive;
+    drive = buildDrive(newDrive);
   }
   
   async function start() {
     if (!drive) {
       throw new Error("cloud drive is undefined");
     }
-    await drive.init();
+    if (drive.init) {
+      await drive.init();
+    }
     
     state = await getState(drive) || {};
     state.enabled = true;
@@ -71,6 +104,9 @@ function dbToCloud({
     state.enabled = false;
     clearTimeout(timer);
     await currentTask;
+    if (drive.uninit) {
+      await drive.uninit();
+    }
     await saveState();
   }
   

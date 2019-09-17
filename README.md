@@ -37,19 +37,9 @@ Usage
 const {dbToCloud, drive: {google}} = require("db-to-cloud");
 
 const sync = dbToCloud({
-  // implement hooks to handle cloud update, communicate with the local DB
+  // hooks to handle cloud update, communicate with the local DB
   async onGet(id) {
     return await myDB.get(id);
-  },
-  async onPost(doc) {
-    // if you don't need to handle post errors (e.g. id conflict),
-    // you can leave this unimplemnted. The library will use onPut 
-    // automatically.
-    try {
-      await this.onPost(doc);
-    } catch (err) {
-      // ...
-    }
   },
   async onPut(doc) {
     try {
@@ -68,7 +58,7 @@ const sync = dbToCloud({
     } catch (err) {}
   },
   
-  // implement hooks to handle the first sync
+  // hooks to handle the first sync
   async onFirstSync() {
     const cursor = myDB.getAllCursor();
     while (!cursor.end()) {
@@ -76,14 +66,14 @@ const sync = dbToCloud({
     }
   },
   
-  // implement hooks to resolve _rev conflict
+  // hooks to resolve _rev conflict
   compareRevision(doc1, doc2) {
     // if we use the timestamp as the revision tag, we can use a simple way to
     // decide which wins
     return doc1._rev - doc2._rev;
   },
   
-  // implement hooks to store metadata about the sync progress
+  // hooks to store metadata about the sync progress
   async getState(drive) {
     try {
       return JSON.parse(localStorage.getItem(`cloudSync/${drive.name}/state`));
@@ -93,7 +83,7 @@ const sync = dbToCloud({
     localStorage.setItem(`cloudSync/${drive.name}/state`, JSON.stringify(state));
   },
   
-  // implement hooks to collect errors
+  // hooks to collect errors
   onError(err) {
     console.error(err);
   }
@@ -123,10 +113,12 @@ try {
 ```js
 // push the change to the cloud when manipulating on the local DB
 doc = await myDB.post(doc);
-sync.post(doc);
+sync.put(doc._id);
+// note that there is no sync.post. Technically, all documents already have an
+// id before sent to cloud.
 
 doc = await myDB.put(doc);
-sync.put(doc);
+sync.put(doc._id);
 
 await myDB.delete(id);
 sync.delete(id);
@@ -153,7 +145,7 @@ sync.start();
 API
 ----
 
-## sync.start
+### sync.start
 
 Start syncing.
 
@@ -165,7 +157,7 @@ After calling this method:
 2. Load the current state.
 3. Setup a timer which will pull remote changes from the drive and push local changes to the drive.
 
-## sync.stop
+### sync.stop
 
 ```js
 await sync.stop();
@@ -180,10 +172,72 @@ After calling this method:
 3. Wait until all running sync task complete.
 4. Save the current state.
 
-Todos
------
+Create a cloud drive adapter
+----------------------------
 
-* Should we add a `_rev` property and allow users to resolve merge conflict manually?
+To create a working adapter, implement following methods:
+
+### init, uninit
+
+```js
+async drive.init() => void
+
+async drive.uninit() => void
+```
+
+Optional. These hooks will be called when `sync.start`/`sync.stop`. If the adapter uses a large dependency, it should be dynamically loaded in `init`.
+
+### get
+
+```js
+async drive.get(path: String) => data: String
+```
+
+Read the data from the drive.
+
+If the path doesn't exist, an error should be thrown and the `code` property should be a string `"ENOENT"`.
+
+### put
+
+```js
+async drive.put(path: String, data: String) => void
+```
+
+Write the data to the drive. The drive should create parent folders automatically.
+
+If the path already exists, it should overwrite the old file.
+
+### post
+
+```js
+async drive.post(path: String, data: String) => void
+```
+
+Write the data to the drive. The drive should create parent folders automatically.
+
+If the path already exists, an error should be thrown and the `code` property should be a string `"EEXIST"`.
+
+### delete
+
+```js
+async drive.delete(path: String) => void
+```
+
+Delete a file. If the path doesn't exist, this function does nothing.
+
+### acquireLock, releaseLock
+
+```js
+async drive.acquireLock(expire: Number) => void
+
+async drive.releaseLock() => void
+```
+
+Optional. The lock is acquired when a sync task starts, and is released after the sync task completes.
+
+If these methods are not implemented, the library will use a file-based lock workflow using `post`, `delete`, and `get` methods.
+
+`expire` defines the lifetime of the lock. If the sync task is interrupted and the lock is never released manually, the lock should be unlocked after `expire` minutes.
 
 Changelog
 ---------
