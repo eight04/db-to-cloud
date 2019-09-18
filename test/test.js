@@ -6,8 +6,9 @@ const assert = require("assert");
 const {makeDir} = require("tempdir-yaml");
 const sinon = require("sinon");
 const logger = require("mocha-logger");
+const fetch = require("node-fetch");
 
-const {dbToCloud, drive: {fsDrive, github}} = require("..");
+const {dbToCloud, drive: {fsDrive, github, dropbox}} = require("..");
 
 function delay(time) {
   return new Promise(resolve => {
@@ -49,6 +50,25 @@ const ADAPTERS = [
       for (const path of this.drive.shaCache.keys()) {
         await this.drive.delete(path);
       }
+    }
+  },
+  {
+    name: "dropbox",
+    valid: () => process.env.DROPBOX_ACCESS_TOKEN,
+    get() {
+      const drive = dropbox({
+        fetch,
+        getAccessToken: () => process.env.DROPBOX_ACCESS_TOKEN
+      });
+      if (!this.drive) {
+        this.drive = drive;
+      }
+      return drive;
+    },
+    async after() {
+      await this.drive.delete("docs");
+      await this.drive.delete("changes");
+      await this.drive.delete("meta.json");
     }
   }
 ];

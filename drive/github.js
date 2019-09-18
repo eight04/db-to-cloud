@@ -1,17 +1,6 @@
 const base64 = require("universal-base64");
 
-// customized error
-class CError extends Error {
-  constructor(code, origin) {
-    super(origin.message);
-    this.name = origin.name;
-    this.code = code;
-    this.origin = origin;
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, CError);
-    }
-  }
-}
+const {CustomError} = require("./error");
 
 function createDrive({
   owner,
@@ -41,7 +30,7 @@ function createDrive({
         return await fn(...args);
       } catch (err) {
         if (err.status === 404) {
-          throw new CError("ENOENT", err);
+          throw new CustomError("ENOENT", err);
         }
         throw err;
       }
@@ -120,7 +109,7 @@ function createDrive({
       });
     } catch (err) {
       if (err.status === 422) {
-        throw new CError("EEXIST", err);
+        throw new CustomError("EEXIST", err);
       }
       throw err;
     }

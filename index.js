@@ -36,10 +36,12 @@ function buildDrive(_drive) {
   drive.get = async path => JSON.parse(await _drive.get(path));
   drive.put = async (path, data) => await _drive.put(path, JSON.stringify(data));
   drive.post = async (path, data) => await _drive.post(path, JSON.stringify(data));
+  
   if (!_drive.acquireLock) {
     drive.acquireLock = acquireLock;
     drive.releaseLock = releaseLock;
   }
+  
   return drive;
   
   async function acquireLock(expire) {
