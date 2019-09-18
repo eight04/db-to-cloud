@@ -29,17 +29,16 @@ function debounced(fn) {
   }
 }
 
-function buildDrive(drive) {
-  return {
-    init: drive.init && drive.init.bind(drive),
-    uninit: drive.uninit && drive.uninit.bind(drive),
-    get: async path => JSON.parse(await drive.get(path)),
-    put: async (path, data) => await drive.put(path, JSON.stringify(data)),
-    post: async (path, data) => await drive.post(path, JSON.stringify(data)),
-    delete: drive.delete.bind(drive),
-    acquireLock: drive.acquireLock ? drive.acquireLock.bind(drive) : acquireLock,
-    releaseLock: drive.acquireLock ? drive.releaseLock.bind(drive) : releaseLock
-  };
+function buildDrive(_drive) {
+  const drive = Object.create(_drive);
+  drive.get = async path => JSON.parse(await _drive.get(path));
+  drive.put = async (path, data) => await _drive.put(path, JSON.stringify(data));
+  drive.post = async (path, data) => await _drive.post(path, JSON.stringify(data));
+  if (!_drive.acquireLock) {
+    drive.acquireLock = acquireLock;
+    drive.releaseLock = releaseLock;
+  }
+  return drive;
   
   async function acquireLock(expire) {
     try {
@@ -78,7 +77,7 @@ function dbToCloud({
   let currentTask;
   const saveState = debounced(() => setState(drive, state));
   const revisionCache = new Map;
-  return {use, start, stop, put, delete: delete_};
+  return {use, start, stop, put, delete: delete_, syncNow};
   
   function use(newDrive) {
     drive = buildDrive(newDrive);
@@ -94,6 +93,9 @@ function dbToCloud({
     
     state = await getState(drive) || {};
     state.enabled = true;
+    if (!state.queue) {
+      state.queue = [];
+    }
     if (state.lastChange == null) {
       await onFirstSync();
     }
@@ -104,7 +106,12 @@ function dbToCloud({
   async function stop() {
     state.enabled = false;
     clearTimeout(timer);
-    await currentTask;
+    try {
+      await currentTask;
+    } catch (err) {
+      // pass
+    }
+    clearTimeout(timer);
     if (drive.uninit) {
       await drive.uninit();
     }
@@ -194,7 +201,7 @@ function dbToCloud({
     const meta = await cache.get("changes/meta.json", {lastChange: 0});
     const index = Math.floor(meta.lastChange / 100);
     const len = meta.lastChange % 100;
-    let lastChanges = await cache.get("changes/${index}.json", []);
+    let lastChanges = await cache.get(`changes/${index}.json`, []);
     // it is possible that JSON data contains more records defined by
     // meta.lastChange
     lastChanges = lastChanges.slice(0, len).concat(newChanges);
@@ -223,8 +230,20 @@ function dbToCloud({
       await drive.releaseLock();
       timer = setTimeout(() => {
         currentTask = sync();
-      }, period);
+      }, period * 60 * 1000);
     }
+  }
+  
+  async function syncNow() {
+    clearTimeout(timer);
+    try {
+      await currentTask;
+    } catch (err) {
+      // pass
+    }
+    clearTimeout(timer);
+    currentTask = sync();
+    await currentTask;
   }
   
   function put(_id, _rev) {
@@ -234,6 +253,7 @@ function dbToCloud({
     state.queue.push({
       _id, _rev, action: "put"
     });
+    saveState();
   }
   
   function delete_(_id, _rev) {
@@ -243,11 +263,12 @@ function dbToCloud({
     state.queue.push({
       _id, _rev, action: "delete"
     });
+    saveState();
   }
   
   function buildCache() {
     const store = new Map;
-    return {get, has};
+    return {get};
     
     async function get(path, default_) {
       let result;
@@ -258,17 +279,13 @@ function dbToCloud({
       try {
         result = await drive.get(path);
       } catch (err) {
-        if (err.code === 404 && default_ !== undefined) {
+        if (err.code === "ENOENT" && default_ !== undefined) {
           return default_;
         }
         throw err;
       }
       store.set(path, result);
       return result;
-    }
-    
-    function has(path) {
-      return store.has(path);
     }
   }
 }

@@ -22,7 +22,10 @@
   "devDependencies": {
     "c8": "^5.0.4",
     "eslint": "^6.1.0",
-    "mocha": "^6.2.0"
+    "mocha": "^6.2.0",
+    "mocha-logger": "^1.0.6",
+    "sinon": "^7.4.2",
+    "tempdir-yaml": "^0.3.0"
   },
   "repository": "eight04/db-to-cloud",
   "eslintIgnore": [

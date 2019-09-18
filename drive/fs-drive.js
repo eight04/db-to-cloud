@@ -15,7 +15,7 @@ function createDrive({
   };
   
   async function init() {
-    [fs, path] = await Promise.resolve([
+    [fs, path] = await Promise.all([
       getFs(),
       Promise.resolve(require("path"))
     ]);

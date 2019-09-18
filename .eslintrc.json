@@ -4,6 +4,7 @@
 		"node": true
 	},
 	"rules": {
+    "no-template-curly-in-string": "error",
 		"no-use-before-define": ["error", "nofunc"],
     "require-atomic-updates": "off",
 		"semi": ["error", "always"]
