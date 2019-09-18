@@ -1,18 +1,160 @@
 /* eslint-env mocha */
-const assert = require("assert");
-const fs = require("fs").promises;
+require("dotenv").config();
 
-const {withDir} = require("tempdir-yaml");
+const assert = require("assert");
+
+const {makeDir} = require("tempdir-yaml");
 const sinon = require("sinon");
 const logger = require("mocha-logger");
 
-const {dbToCloud} = require("..");
-const fsDrive = require("../drive/fs-drive");
+const {dbToCloud, drive: {fsDrive, github}} = require("..");
 
 function delay(time) {
   return new Promise(resolve => {
     setTimeout(resolve, time);
   });
+}
+
+const ADAPTERS = [
+  {
+    name: "fs-drive",
+    valid: () => true,
+    async before() {
+      this.dir = await makeDir();
+    },
+    async after() {
+      await this.dir.cleanup();
+    },
+    get() {
+      return fsDrive({
+        folder: this.dir.resolve(".")
+      });
+    }
+  },
+  {
+    name: "github",
+    valid: () => process.env.GITHUB_ACCESS_TOKEN,
+    get() {
+      const drive = github({
+        owner: process.env.GITHUB_OWNER,
+        repo: "_db_to_cloud_test",
+        getAccessToken: () => process.env.GITHUB_ACCESS_TOKEN
+      });
+      if (!this.drive) {
+        this.drive = drive;
+      }
+      return drive;
+    },
+    async after() {
+      for (const path of this.drive.shaCache.keys()) {
+        await this.drive.delete(path);
+      }
+    }
+  }
+];
+
+async function suite(prepare) {
+  const data = {
+    1: {
+      _id: 1,
+      _rev: 1,
+      foo: "bar"
+    },
+    2: {
+      _id: 2,
+      _rev: 1,
+      bar: "baz"
+    }
+  };
+  const {sync, options, drive} = prepare(data);
+  await sync.start();
+
+  logger.log("started, data should be written to drive");
+
+  {
+    const doc = JSON.parse(await drive.get("docs/2.json"));
+    assert.deepStrictEqual(doc, data[2]);
+    const meta = JSON.parse(await drive.get("changes/meta.json"));
+    assert.equal(meta.lastChange, 2);
+    const changes = JSON.parse(await drive.get("changes/0.json"));
+    assert.deepStrictEqual(changes, [
+      {
+        _id: 1,
+        _rev: 1,
+        action: "put"
+      },
+      {
+        _id: 2,
+        _rev: 1,
+        action: "put"
+      }
+    ]);
+  }
+
+  logger.log("getState/setState should be able to access drive name");
+
+  assert(drive.name);
+  assert.equal(options.getState.lastCall.args[0].name, drive.name);
+
+  logger.log("start and sync with the second instance");
+
+  const {sync: sync2, data: data2} = prepare();
+  await sync2.start();
+  assert.deepStrictEqual(data2, data);
+
+  logger.log("change should flow to other instances");
+
+  data2[3] = {
+    _id: 3,
+    _rev: 1,
+    baz: "bak"
+  };
+  sync2.put(3, 1);
+  data2[1]._rev = 2;
+  data2[1].foo = "foo";
+  sync2.put(1, 2);
+  delete data2[2];
+  sync2.delete(2, 2);
+
+  await sync2.syncNow();
+  await sync.syncNow();
+
+  assert.deepStrictEqual(data, data2);
+  assert.equal(data[1].foo, "foo");
+  assert.equal(data[2], undefined);
+  assert.equal(data[3].baz, "bak");
+  
+  // we only test this on local disk
+  if (drive.name === "fs-drive") {
+    logger.log("100 changes");
+
+    for (let i = 0; i < 100; i++) {
+      data[4 + i] = {
+        _id: 4 + i,
+        _rev: 1,
+        value: Math.floor(Math.random() * 100)
+      };
+      sync.put(4 + i, 1);
+    }
+
+    await sync.syncNow();
+    await sync2.syncNow();
+
+    assert.deepStrictEqual(data2, data);
+  }
+
+  logger.log("cloud is locked while syncing");
+
+  options.fetchDelay = 500;
+
+  data[1].foo = "not foo";
+  data[1]._rev++;
+  sync.put(1, data[1]._rev);
+  const p = sync.syncNow();
+  await assert.rejects(sync2.syncNow, {code: "EEXIST"});
+  await p;
+
+  options.fetchDelay = 0;
 }
 
 describe("functional", () => {
@@ -25,7 +167,36 @@ describe("functional", () => {
     instances.length = 0;
   });
   
-  function prepare(folder, data = {}) {
+  for (const adapter of ADAPTERS) {
+    describe(adapter.name, function() {
+      if (!adapter.valid()) {
+        logger.log(`invalid context, skip ${adapter.name}`);
+        return;
+      }
+      
+      before(async function() {
+        this.timeout(5 * 60 * 1000);
+        if (adapter.before) {
+          await adapter.before();
+        }
+      });
+      
+      after(async function() {
+        this.timeout(5 * 60 * 1000);
+        if (adapter.after) {
+          await adapter.after();
+        }
+      });
+      
+      it("run suite", async function() {
+        this.timeout(5 * 60 * 1000);
+        const getDrive = adapter.get.bind(adapter);
+        await suite(data => prepare(getDrive, data));
+      });
+    });
+  }
+  
+  function prepare(getDrive, data = {}) {
     const compareRevision = sinon.spy((a, b) => a - b);
     const options = {
       fetchDelay: 0,
@@ -55,112 +226,9 @@ describe("functional", () => {
       setState: sinon.spy()
     };
     const sync = dbToCloud(options);
-    sync.use(fsDrive({
-      folder
-    }));
+    const drive = getDrive();
+    sync.use(drive);
     instances.push(sync);
-    return {sync, options, data};
+    return {sync, options, data, drive};
   }
-
-  it("setup with empty drive", () =>
-    withDir(async resolve => {
-      const data = {
-        1: {
-          _id: 1,
-          _rev: 1,
-          foo: "bar"
-        },
-        2: {
-          _id: 2,
-          _rev: 1,
-          bar: "baz"
-        }
-      };
-      const {sync, options} = prepare(resolve("."), data);
-      await sync.start();
-      
-      logger.log("started, data should be written to drive");
-      
-      {
-        const doc = JSON.parse(await fs.readFile(resolve("docs/2.json"), "utf8"));
-        assert.deepStrictEqual(doc, data[2]);
-        const meta = JSON.parse(await fs.readFile(resolve("changes/meta.json"), "utf8"));
-        assert.equal(meta.lastChange, 2);
-        const changes = JSON.parse(await fs.readFile(resolve("changes/0.json"), "utf8"));
-        assert.deepStrictEqual(changes, [
-          {
-            _id: 1,
-            _rev: 1,
-            action: "put"
-          },
-          {
-            _id: 2,
-            _rev: 1,
-            action: "put"
-          }
-        ]);
-      }
-      
-      logger.log("getState/setState should be able to access drive name");
-      
-      assert.equal(options.getState.lastCall.args[0].name, "fs-drive");
-      
-      logger.log("start and sync with the second instance");
-      
-      const {sync: sync2, data: data2} = prepare(resolve("."));
-      await sync2.start();
-      assert.deepStrictEqual(data2, data);
-      
-      logger.log("change should flow to other instances");
-      
-      data2[3] = {
-        _id: 3,
-        _rev: 1,
-        baz: "bak"
-      };
-      sync2.put(3, 1);
-      data2[1]._rev = 2;
-      data2[1].foo = "foo";
-      sync2.put(1, 2);
-      delete data2[2];
-      sync2.delete(2, 2);
-      
-      await sync2.syncNow();
-      await sync.syncNow();
-      
-      assert.deepStrictEqual(data, data2);
-      assert.equal(data[1].foo, "foo");
-      assert.equal(data[2], undefined);
-      assert.equal(data[3].baz, "bak");
-      
-      logger.log("100 changes");
-      
-      for (let i = 0; i < 100; i++) {
-        data[4 + i] = {
-          _id: 4 + i,
-          _rev: 1,
-          value: Math.floor(Math.random() * 100)
-        };
-        sync.put(4 + i, 1);
-      }
-      
-      await sync.syncNow();
-      await sync2.syncNow();
-      
-      assert.deepStrictEqual(data2, data);
-      
-      logger.log("cloud is locked while syncing");
-      
-      options.fetchDelay = 500;
-      
-      data[1].foo = "not foo";
-      data[1]._rev++;
-      sync.put(1, data[1]._rev);
-      const p = sync.syncNow();
-      await assert.rejects(sync2.syncNow, {code: "EEXIST"});
-      await p;
-      
-      options.fetchDelay = 0;
-    })
-  );
 });

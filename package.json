@@ -18,9 +18,14 @@
     "postversion": "git push --follow-tags && npm publish"
   },
   "main": "index.js",
-  "dependencies": {},
+  "dependencies": {
+    "@octokit/plugin-throttling": "^2.6.0",
+    "@octokit/rest": "^16.28.9",
+    "universal-base64": "^2.1.0"
+  },
   "devDependencies": {
     "c8": "^5.0.4",
+    "dotenv": "^8.1.0",
     "eslint": "^6.1.0",
     "mocha": "^6.2.0",
     "mocha-logger": "^1.0.6",

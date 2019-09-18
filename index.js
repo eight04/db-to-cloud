@@ -1,3 +1,5 @@
+const drive = require("./drive");
+
 function debounced(fn) {
   let timer = 0;
   let q;
@@ -290,4 +292,4 @@ function dbToCloud({
   }
 }
 
-module.exports = {dbToCloud};
+module.exports = {dbToCloud, drive};
