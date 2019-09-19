@@ -165,14 +165,17 @@ async function suite(prepare) {
 
   logger.log("cloud is locked while syncing");
 
-  options.fetchDelay = 500;
+  options.fetchDelay = 1000;
 
   data[1].foo = "not foo";
   data[1]._rev++;
   sync.put(1, data[1]._rev);
   const p = sync.syncNow();
-  await assert.rejects(sync2.syncNow, {code: "EEXIST"});
-  await p;
+  await delay(500);
+  await Promise.all([
+    p,
+    assert.rejects(sync2.syncNow, {code: "EEXIST"})
+  ]);
 
   options.fetchDelay = 0;
 }
