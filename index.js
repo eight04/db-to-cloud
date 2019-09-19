@@ -1,3 +1,4 @@
+const {createLock} = require("@eight04/read-write-lock");
 const drive = require("./drive");
 
 function debounced(fn) {
@@ -79,8 +80,10 @@ function dbToCloud({
   let timer;
   let state;
   let currentTask;
+  let pendingTask;
   const saveState = debounced(() => setState(drive, state));
   const revisionCache = new Map;
+  const lock = createLock();
   return {use, start, stop, put, delete: delete_, syncNow};
   
   function use(newDrive) {
@@ -103,23 +106,18 @@ function dbToCloud({
     if (state.lastChange == null) {
       await onFirstSync();
     }
-    currentTask = sync();
-    await currentTask;
+    await syncNow();
   }
   
   async function stop() {
     state.enabled = false;
-    clearTimeout(timer);
-    try {
-      await currentTask;
-    } catch (err) {
-      // pass
-    }
-    clearTimeout(timer);
-    if (drive.uninit) {
-      await drive.uninit();
-    }
-    await saveState();
+    await lock.write(async () => {
+      clearTimeout(timer);
+      if (drive.uninit) {
+        await drive.uninit();
+      }
+      await saveState();
+    });
   }
   
   async function syncPull(cache) {
@@ -223,6 +221,10 @@ function dbToCloud({
   
   async function sync() {
     await drive.acquireLock(lockExpire);
+    const meta = drive.getMeta();
+    if (meta.lastChange === state.lastChange && !state.queue.length) {
+      return;
+    }
     const cache = buildCache();
     try {
       await syncPull(cache);
@@ -232,22 +234,30 @@ function dbToCloud({
       throw err;
     } finally {
       await drive.releaseLock();
-      timer = setTimeout(() => {
-        currentTask = sync();
-      }, period * 60 * 1000);
     }
   }
   
   async function syncNow() {
-    clearTimeout(timer);
-    try {
-      await currentTask;
-    } catch (err) {
-      // pass
+    if (!state.enabled) {
+      throw new Error("Cannot sync now, the sync is not enabled");
     }
+    await lock.write(async () => {
+      try {
+        await sync();
+      } finally {
+        schedule();
+      }
+    });
+  }
+  
+  function schedule() {
     clearTimeout(timer);
-    currentTask = sync();
-    await currentTask;
+    timer = setTimeout(() => {
+      if (lock.length) {
+        return;
+      }
+      syncNow();
+    }, period * 60 * 1000);
   }
   
   function put(_id, _rev) {

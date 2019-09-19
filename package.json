@@ -19,6 +19,7 @@
   },
   "main": "index.js",
   "dependencies": {
+    "@eight04/read-write-lock": "^0.1.0",
     "@octokit/plugin-throttling": "^2.6.0",
     "@octokit/rest": "^16.28.9",
     "dropbox": "^4.0.30",
