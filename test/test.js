@@ -92,10 +92,10 @@ async function suite(prepare) {
   logger.log("started, data should be written to drive");
 
   {
+    const meta = await sync.drive().getMeta();
+    assert.equal(meta.lastChange, 2);
     const doc = JSON.parse(await drive.get("docs/2.json"));
     assert.deepStrictEqual(doc, data[2]);
-    const meta = JSON.parse(await drive.get("changes/meta.json"));
-    assert.equal(meta.lastChange, 2);
     const changes = JSON.parse(await drive.get("changes/0.json"));
     assert.deepStrictEqual(changes, [
       {

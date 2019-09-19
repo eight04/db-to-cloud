@@ -314,9 +314,33 @@ async drive.releaseLock() => void
 
 Optional. The lock is acquired when a sync task starts, and is released after the sync task completes.
 
-If these methods are not implemented, the library will use a file-based lock workflow using `post`, `delete`, and `get` methods.
+If these methods are not implemented, the library uses a file-based lock `lock.json` storing in the drive, using `post`, `delete`, and `get` methods.
 
 `expire` defines the lifetime of the lock. If the sync task is interrupted and the lock is never released manually, the lock should be unlocked after `expire` minutes.
+
+### getMeta, putMeta
+
+```js
+async drive.getMeta() => Object
+
+async drive.putMeta(meta: Object) => void
+```
+
+Optional. Save/store metadata in the server.
+
+If these methods are not implemented, the library stores the metadata as `meta.json` in the drive.
+
+If the metadata is not set yet i.e. the first sync, `getMeta` should return an empty object `{}`.
+
+### peekChanges
+
+```js
+async drive.peekChanges() => Boolean
+```
+
+Optional. Check if the cloud has been changed.
+
+If this method is not implemented, the library `getMeta()` and check if the metadata is changed.
 
 Changelog
 ---------

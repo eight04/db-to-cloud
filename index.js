@@ -38,9 +38,18 @@ function buildDrive(_drive) {
   drive.put = async (path, data) => await _drive.put(path, JSON.stringify(data));
   drive.post = async (path, data) => await _drive.post(path, JSON.stringify(data));
   
-  if (!_drive.acquireLock) {
+  if (!drive.acquireLock) {
     drive.acquireLock = acquireLock;
     drive.releaseLock = releaseLock;
+  }
+  
+  if (!drive.getMeta) {
+    drive.getMeta = getMeta;
+    drive.putMeta = putMeta;
+  }
+  
+  if (!drive.peekChanges) {
+    drive.peekChanges = peekChanges;
   }
   
   return drive;
@@ -62,6 +71,26 @@ function buildDrive(_drive) {
   async function releaseLock() {
     await this.delete("lock.json");
   }
+  
+  async function getMeta() {
+    try {
+      return await this.get("meta.json");
+    } catch (err) {
+      if (err.code === "ENOENT") {
+        return {};
+      }
+      throw err;
+    }
+  }
+  
+  async function putMeta(data) {
+    await this.put("meta.json", data);
+  }
+  
+  async function peekChanges(oldMeta) {
+    const newMeta = await this.getMeta();
+    return newMeta.lastChange !== oldMeta.lastChange;
+  }
 }
 
 function dbToCloud({
@@ -79,12 +108,12 @@ function dbToCloud({
   let drive;
   let timer;
   let state;
-  let currentTask;
-  let pendingTask;
+  let meta;
+  const changeCache = new Map;
   const saveState = debounced(() => setState(drive, state));
   const revisionCache = new Map;
   const lock = createLock();
-  return {use, start, stop, put, delete: delete_, syncNow};
+  return {use, start, stop, put, delete: delete_, syncNow, drive: () => drive};
   
   function use(newDrive) {
     drive = buildDrive(newDrive);
@@ -120,8 +149,8 @@ function dbToCloud({
     });
   }
   
-  async function syncPull(cache) {
-    const meta = await cache.get("changes/meta.json", {});
+  async function syncPull() {
+    meta = await drive.getMeta();
     if (!meta.lastChange || meta.lastChange === state.lastChange) {
       // nothing changes
       return;
@@ -135,7 +164,9 @@ function dbToCloud({
       const end = Math.floor((meta.lastChange - 1) / 100); // inclusive end
       let i = Math.floor(state.lastChange / 100);
       while (i <= end) {
-        changes = changes.concat(await cache.get(`changes/${i}.json`));
+        const newChanges = await drive.get(`changes/${i}.json`);
+        changeCache.set(i, newChanges);
+        changes = changes.concat(newChanges);
         i++;
       }
       changes = changes.slice(state.lastChange % 100);
@@ -151,7 +182,7 @@ function dbToCloud({
       } else if (change.action === "put") {
         let doc;
         try {
-          doc = await cache.get(`docs/${id}.json`);
+          doc = await drive.get(`docs/${id}.json`);
         } catch (err) {
           if (err.code === "ENOENT") {
             await onError(new Error(`Cannot find ${id}. Is it deleted without updating the history?`));
@@ -168,15 +199,14 @@ function dbToCloud({
     await saveState();
   }
   
-  async function syncPush(cache) {
+  async function syncPush() {
     if (!state.queue.length) {
       // nothing to push
       return;
     }
-    
     // snapshot
     const changes = state.queue.slice();
-    
+
     // merge changes
     const idx = new Map;
     for (const change of changes) {
@@ -199,20 +229,32 @@ function dbToCloud({
       newChanges.push(change);
     }
     
-    // update changes/meta
-    const meta = await cache.get("changes/meta.json", {lastChange: 0});
-    const index = Math.floor(meta.lastChange / 100);
-    const len = meta.lastChange % 100;
-    let lastChanges = await cache.get(`changes/${index}.json`, []);
-    // it is possible that JSON data contains more records defined by
-    // meta.lastChange
-    lastChanges = lastChanges.slice(0, len).concat(newChanges);
+    // push changes
+    let lastChanges;
+    let index;
+    // meta is already pulled in syncPull
+    if (meta.lastChange) {
+      index = Math.floor(meta.lastChange / 100);
+      const len = meta.lastChange % 100;
+      lastChanges = len ?
+        changeCache.get(index) || await drive.get(`changes/${index}.json`) :
+        [];
+      // it is possible that JSON data contains more records defined by
+      // meta.lastChange
+      lastChanges = lastChanges.slice(0, len).concat(newChanges);
+    } else {
+      // first sync
+      index = 0;
+      lastChanges = newChanges;
+    }
     
     for (let i = 0; i * 100 < lastChanges.length; i++) {
-      await drive.put(`changes/${index + i}.json`, lastChanges.slice(i * 100, (i + 1) * 100));
+      const window = lastChanges.slice(i * 100, (i + 1) * 100);
+      await drive.put(`changes/${index + i}.json`, window);
+      changeCache.set(index + i, window);
     }
-    meta.lastChange += newChanges.length;
-    await drive.put("changes/meta.json", meta);
+    meta.lastChange = (meta.lastChange || 0) + newChanges.length;
+    await drive.putMeta(meta);
     
     state.queue = state.queue.slice(changes.length);
     state.lastChange = meta.lastChange;
@@ -221,14 +263,9 @@ function dbToCloud({
   
   async function sync() {
     await drive.acquireLock(lockExpire);
-    const meta = drive.getMeta();
-    if (meta.lastChange === state.lastChange && !state.queue.length) {
-      return;
-    }
-    const cache = buildCache();
     try {
-      await syncPull(cache);
-      await syncPush(cache);
+      await syncPull();
+      await syncPush();
     } catch (err) {
       await onError(err);
       throw err;
@@ -237,12 +274,18 @@ function dbToCloud({
     }
   }
   
-  async function syncNow() {
+  async function syncNow(peek = false) {
     if (!state.enabled) {
       throw new Error("Cannot sync now, the sync is not enabled");
     }
     await lock.write(async () => {
       try {
+        if (peek && !state.queue.length) {
+          const changed = await drive.peekChanges(meta);
+          if (!changed) {
+            return;
+          }
+        }
         await sync();
       } finally {
         schedule();
@@ -256,7 +299,7 @@ function dbToCloud({
       if (lock.length) {
         return;
       }
-      syncNow();
+      syncNow(true);
     }, period * 60 * 1000);
   }
   
@@ -278,29 +321,6 @@ function dbToCloud({
       _id, _rev, action: "delete"
     });
     saveState();
-  }
-  
-  function buildCache() {
-    const store = new Map;
-    return {get};
-    
-    async function get(path, default_) {
-      let result;
-      result = store.get(path);
-      if (result !== undefined) {
-        return result;
-      }
-      try {
-        result = await drive.get(path);
-      } catch (err) {
-        if (err.code === "ENOENT" && default_ !== undefined) {
-          return default_;
-        }
-        throw err;
-      }
-      store.set(path, result);
-      return result;
-    }
   }
 }
 
