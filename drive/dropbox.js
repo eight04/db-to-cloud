@@ -28,7 +28,6 @@ function createDrive({
   fetch: _fetch = fetch
 }) {
   let dropbox;
-  let token;
   return {
     name: "dropbox",
     init,
@@ -45,8 +44,7 @@ function createDrive({
       fetch: _fetch,
       clientId
     });
-    token = await getAccessToken(dropbox);
-    dropbox.setAccessToken(token);
+    dropbox.setAccessToken(await getAccessToken(dropbox));
   }
   
   async function list(file) {

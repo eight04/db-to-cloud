@@ -2,18 +2,48 @@
 require("dotenv").config();
 
 const assert = require("assert");
+const readline = require("readline");
 
 const {makeDir} = require("tempdir-yaml");
 const sinon = require("sinon");
 const logger = require("mocha-logger");
 const fetch = require("node-fetch");
 
-const {dbToCloud, drive: {fsDrive, github, dropbox}} = require("..");
+const {dbToCloud, drive: {fsDrive, github, dropbox, onedrive}} = require("..");
 
 function delay(time) {
   return new Promise(resolve => {
     setTimeout(resolve, time);
   });
+}
+
+function question(text) {
+  return new Promise(resolve => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+    rl.question(text, answer => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
+
+async function getOneDriveAccessToken()  {
+  console.log("Open the URL to login:");
+  console.log(`https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${process.env.AZURE_APP_ID}&scope=files.readwrite&response_type=code&redirect_uri=https://login.microsoftonline.com/common/oauth2/nativeclient`);
+  const url = await question("Input redirected URL:\n");
+  const code = new URL(url).searchParams.get("code");
+  const res = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
+    method: "POST",
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: `client_id=${process.env.AZURE_APP_ID}&redirect_uri=https://login.microsoftonline.com/common/oauth2/nativeclient&code=${code}&grant_type=authorization_code`
+  });
+  const result = await res.json();
+  return result.access_token;
 }
 
 const ADAPTERS = [
@@ -59,6 +89,28 @@ const ADAPTERS = [
       const drive = dropbox({
         fetch,
         getAccessToken: () => process.env.DROPBOX_ACCESS_TOKEN
+      });
+      if (!this.drive) {
+        this.drive = drive;
+      }
+      return drive;
+    },
+    async after() {
+      await this.drive.delete("docs");
+      await this.drive.delete("changes");
+      await this.drive.delete("meta.json");
+    }
+  },
+  {
+    name: "onedrive",
+    valid: () => process.env.AZURE_APP_ID,
+    async before() {
+      this.token = await getOneDriveAccessToken();
+    },
+    get() {
+      const drive = onedrive({
+        fetch,
+        getAccessToken: () => this.token
       });
       if (!this.drive) {
         this.drive = drive;

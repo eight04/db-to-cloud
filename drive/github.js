@@ -8,7 +8,6 @@ function createDrive({
   getAccessToken
 }) {
   let octokit;
-  let token;
   const shaCache = new Map;
   const api = {
     name: "github",
@@ -42,10 +41,7 @@ function createDrive({
     const {Octokit} = await Promise.resolve(require("./github-core"));
     octokit = new Octokit({
       async auth() {
-        if (!token) {
-          token = await getAccessToken();
-        }
-        return `token ${token}`;
+        return `token ${await getAccessToken()}`;
       },
       throttle: {
         onAbuseLimit: (retryAfter, options) => {
