@@ -8,6 +8,7 @@ const {makeDir} = require("tempdir-yaml");
 const sinon = require("sinon");
 const logger = require("mocha-logger");
 const fetch = require("node-fetch");
+const clipboardy = require("clipboardy");
 
 const {dbToCloud, drive: {fsDrive, github, dropbox, onedrive}} = require("..");
 
@@ -31,18 +32,23 @@ function question(text) {
 }
 
 async function getOneDriveAccessToken()  {
+  if (process.env.AZURE_ACCESS_TOKEN && Date.now() < Number(process.env.AZURE_ACCESS_TOKEN_EXPIRE)) {
+    return process.env.AZURE_ACCESS_TOKEN;
+  }
   console.log("Open the URL to login:");
-  console.log(`https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${process.env.AZURE_APP_ID}&scope=files.readwrite&response_type=code&redirect_uri=https://login.microsoftonline.com/common/oauth2/nativeclient`);
-  const url = await question("Input redirected URL:\n");
+  console.log(`https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${process.env.AZURE_APP_ID}&scope=Files.ReadWrite.AppFolder&response_type=code&redirect_uri=https://login.microsoftonline.com/common/oauth2/nativeclient`);
+  const url = await question("\nInput redirected URL:\n");
   const code = new URL(url).searchParams.get("code");
   const res = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
     method: "POST",
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded'
     },
-    body: `client_id=${process.env.AZURE_APP_ID}&redirect_uri=https://login.microsoftonline.com/common/oauth2/nativeclient&code=${code}&grant_type=authorization_code`
+    body: `client_id=${process.env.AZURE_APP_ID}&redirect_uri=https://login.microsoftonline.com/common/oauth2/nativeclient&code=${code}&grant_type=authorization_code&scope=Files.ReadWrite.AppFolder`
   });
   const result = await res.json();
+  await clipboardy.write(`AZURE_ACCESS_TOKEN=${result.access_token}\nAZURE_ACCESS_TOKEN_EXPIRE=${Date.now() + result.expires_in * 1000}`);
+  console.log("\nENV are copied to clipboard");
   return result.access_token;
 }
 
@@ -124,6 +130,15 @@ const ADAPTERS = [
     }
   }
 ];
+
+// (async () => {
+  // const adapter = ADAPTERS.slice(-1)[0];
+  // await adapter.before();
+  // const drive = await adapter.get();
+  // console.log(await drive.delete("test.txt", "version 3"));
+// })()
+  // .catch(console.error);
+// return;
 
 async function suite(prepare) {
   const data = {
@@ -217,13 +232,13 @@ async function suite(prepare) {
 
   logger.log("cloud is locked while syncing");
 
-  options.fetchDelay = 1000;
+  options.fetchDelay = 3000;
 
   data[1].foo = "not foo";
   data[1]._rev++;
   sync.put(1, data[1]._rev);
   const p = sync.syncNow();
-  await delay(500);
+  await delay(1500);
   await Promise.all([
     p,
     assert.rejects(sync2.syncNow, {code: "EEXIST"})

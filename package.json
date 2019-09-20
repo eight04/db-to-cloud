@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "c8": "^5.0.4",
+    "clipboardy": "^2.1.0",
     "dotenv": "^8.1.0",
     "eslint": "^6.1.0",
     "mocha": "^6.2.0",

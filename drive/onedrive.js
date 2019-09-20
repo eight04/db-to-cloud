@@ -1,6 +1,8 @@
+/* global fetch */
+const {CustomError} = require("./error");
+
 function createDrive({
   getAccessToken,
-  clientId,
   fetch: _fetch = fetch
 }) {
   return {
@@ -12,66 +14,72 @@ function createDrive({
     list
   };
   
-  async function list(file) {
-    const names = [];
-    let result = await dropbox.filesListFolder({
-      path: `/${file}`
+  async function query({method = "GET", path, headers, format = "json", ...args}) {
+    const res = await _fetch(`https://graph.microsoft.com/v1.0/me/drive/special/approot${path}`, {
+      method,
+      headers: {
+        "Authorization": `bearer ${await getAccessToken()}`,
+        ...headers
+      },
+      ...args
     });
-    for (const entry of result.entries) {
-      names.push(entry.name);
+    if (!res.ok) {
+      const {error} = await res.json();
+      throw new CustomError(error.code, error);
     }
-    if (!result.has_more) {
-      return names;
+    if (format) {
+      return await res[format]();
     }
-    let cursor = result.cursor;
-    while (result.has_more) {
-      result = await dropbox.filesListFolderContinue({cursor});
-      cursor = result.cursor;
-      for (const entry of result.entries) {
-        names.push(entry.name);
-      }
+  }
+  
+  async function list(file) {
+    if (file) {
+      file = `:/${file}:`;
     }
-    return names;
+    const result = await query({
+      path: `${file}/children?select=name`
+    });
+    return result.value.map(i => i.name);
   }
   
   async function get(file) {
-    let result;
     try {
-      result = await dropbox.filesDownload({
-        path: `/${file}`
+      return await query({
+        path: `:/${file}:/content`,
+        format: "text"
       });
     } catch (err) {
-      if (testErrorSummary(err, "not_found")) {
-        throw new CustomError("ENOENT", err);
+      if (err.code === "itemNotFound") {
+        err.code = "ENOENT";
       }
       throw err;
     }
-    if (result.fileBinary) {
-      return result.fileBinary.toString();
-    }
-    return await blobToText(result.fileBlob);
   }
   
   async function put(file, data) {
-    await dropbox.filesUpload({
-      contents: data,
-      path: `/${file}`,
-      mode: "overwrite",
-      autorename: false
+    await query({
+      method: "PUT",
+      path: `:/${file}:/content`,
+      headers: {
+        "Content-Type": "text/plain"
+      },
+      body: data
     });
   }
   
   async function post(file, data) {
     try {
-      await dropbox.filesUpload({
-        contents: data,
-        path: `/${file}`,
-        mode: "add",
-        autorename: false
+      await query({
+        method: "PUT",
+        path: `:/${file}:/content?@microsoft.graph.conflictBehavior=fail`,
+        headers: {
+          "Content-Type": "text/plain"
+        },
+        body: data
       });
     } catch (err) {
-      if (testErrorSummary(err, "conflict")) {
-        throw new CustomError("EEXIST", err);
+      if (err.code === "nameAlreadyExists") {
+        err.code = "EEXIST";
       }
       throw err;
     }
@@ -79,11 +87,13 @@ function createDrive({
   
   async function delete_(file) {
     try {
-      await dropbox.filesDelete({
-        path: `/${file}`
+      await query({
+        method: "DELETE",
+        path: `:/${file}:`,
+        format: null
       });
     } catch (err) {
-      if (testErrorSummary(err, "not_found")) {
+      if (err.code === "itemNotFound") {
         return;
       }
       throw err;
