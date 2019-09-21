@@ -193,7 +193,9 @@ function dbToCloud({
         await onPut(doc);
       }
       // record the remote revision
-      revisionCache.set(id, change._rev);
+      if (change._rev) {
+        revisionCache.set(id, change._rev);
+      }
     }
     state.lastChange = meta.lastChange;
     await saveState();
