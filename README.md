@@ -1,6 +1,9 @@
 db-to-cloud
 ===========
 
+[![Build Status](https://travis-ci.com/eight04/db-to-cloud.svg?branch=master)](https://travis-ci.com/eight04/db-to-cloud)
+[![codecov](https://codecov.io/gh/eight04/db-to-cloud/branch/master/graph/badge.svg)](https://codecov.io/gh/eight04/db-to-cloud)
+
 Synchronize your database with a cloud drive i.e. Dropbox, Google Drive, OneDrive, Github, etc.
 
 To use this library, add following properties to the document:
