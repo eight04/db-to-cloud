@@ -102,6 +102,8 @@ try {
   // handle login/connection errors?
   // ...
 }
+
+syncTimer = setInterval(sync.syncNow, 30 * 60 * 1000); // trigger sync every 30 minutes
 ```
 
 ### Update the cloud when manipulating the database
@@ -124,6 +126,8 @@ sync.delete(_id, _rev);
 ### Switch to a different drive
 
 ```js
+clearInterval(syncTimer);
+
 await sync.stop();
 
 const newDrive = github({
@@ -136,11 +140,18 @@ const newDrive = github({
 });
 sync.use(newDrive);
 
-sync.start();
+await sync.start();
+
+syncTimer = setInterval(sync.syncNow, 30 * 60 * 1000);
 ```
 
 API
 ----
+
+This module exports following properties:
+
+* `dbToCloud`: Initialize the sync controller.
+* `drive`: A cloudName/cloudFactory map.
 
 ### dbToCloud
 
@@ -150,16 +161,15 @@ dbToCloud({
   onPut: async (document) => void,
   onDelete: async (id, rev) => void,
   
-  onError: async (error) => void,
-  
   onFirstSync: async () => void,
   
   compareRevision: (revision1, revision2) => cmpResult: Number,
   
   getState: async (drive) => state: Object,
-  setState: async (drive, state) => void
+  setState: async (drive, state) => void,
   
-  period?: Number,
+  onWarn: (message: String) => void,
+  
   lockExpire?: Number
 }) => sync: SyncController
 ```
@@ -170,7 +180,7 @@ Create a sync controller. [Usage example](#setup).
 
 `onDelete` also accept a revision tag. You can use it to decide if the deletion take place or should be ignored.
 
-Use `onError` to collect sync errors. You may want to show an error log to the user.
+Use `onWarn` to collect warnings. Default: `console.error`
 
 `onFirstSync` is called on the first sync. You can push all local documents to the cloud in this hook.
 
@@ -178,17 +188,15 @@ Use `onError` to collect sync errors. You may want to show an error log to the u
 
 `getState` and `setState` are used to get/store the current state of the sync process. You should save the state object to a file or `localStorage`. If `getState` returns `undefined` then it is the first sync. `drive` is a cloud drive adapter instance. You can get the drive name from `drive.name`.
 
-`period` decides the sync interval. In minutes. Default: `5`.
-
 When syncing, the controller will lock the cloud drive. However, if the process is interrupted (e.g. crashed) and failed to unlock, the lock will expire after `lockExpire` minutes. Default: `60`.
 
 ### sync.use
 
 ```js
-sync.use(cloud) => void
+sync.use(cloud: CloudAdapter) => void
 ```
 
-Use a cloud adapter. The cloud is not initialized until calling `sync.start()`.
+Use a cloud adapter.
 
 ### sync.start
 
@@ -198,14 +206,9 @@ async sync.start() => void
 
 Start syncing.
 
-Without calling this function, sending items to `sync.put`, `sync.delete`, etc, has no effect. Documents are added to queue only if this function is called.
+Without calling this function, sending items to `sync.put`, `sync.delete`, etc, has no effect. Documents are added to the queue only if this function is called.
 
-After calling this method:
-
-1. Initialize the cloud.
-2. Load the current state.
-3. Start collecting local changes.
-4. Setup a timer which will pull remote changes from the drive and push local changes to the drive.
+Calling this function also triggers the initial sync.
 
 ### sync.stop
 
@@ -215,13 +218,12 @@ async sync.stop() => void
 
 Stop syncing.
 
-After calling this method:
+This method do following stuff:
 
 1. Stop collecting local changes.
-2. Remove the timer of the sync process.
-3. Wait until all running sync task complete.
-4. Uninitialize the cloud.
-5. Save the current state.
+2. Wait until all running sync task complete.
+3. Uninitialize the cloud.
+4. Save the current state.
 
 ### sync.put
 
@@ -239,8 +241,84 @@ sync.delete(id, revision) => void
 
 Add a "delete action" to the history queue.
 
-Create a cloud drive adapter
-----------------------------
+### sync.syncNow
+
+```js
+async sync.syncNow(peekChanges: Boolean = true) => void
+```
+
+Sync now. Pull changes from the cloud and push local changes to the cloud.
+
+When `peekChanges` is `true`, the controller calls `cloud.peekChanges` to check if changes are available.
+
+Drives
+-------
+
+The library already implemented 5 cloud drive adapters.
+
+### fsDrive
+
+```js
+fsDrive({
+  folder: String,
+  getFs?: async () => fsModule.promises
+}) => CloudAdapter
+```
+
+This adapter stores data to local disk.
+
+`getFs` defaults to `() => import("fs").then(fs => fs.promises)`.
+
+### dropbox
+
+```js
+dropbox({
+  getAccessToken: async () => token: String,
+  clientId: String,
+  fetch?
+}) => CloudAdapter
+```
+
+This adapter stores data to Dropbox.
+
+### github
+
+```js
+github({
+  getAccessToken: async () => token: String,
+  owner: String,
+  repo: String
+}) => CloudAdapter
+```
+
+This adapter stores data to Github repository `owner/repo`.
+
+### google
+
+```js
+google({
+  getAccessToken: async () => token: String,
+  fetch?,
+  FormData?,
+  Blob?
+}) => CloudAdapter
+```
+
+This adapter stores data to Google Drive.
+
+### onedrive
+
+```js
+onedrive({
+  getAccessToken: async () => token: String,
+  fetch?
+}) => CloudAdapter
+```
+
+This adapter stores data to OneDrive.
+
+Create a customized cloud drive adapter
+---------------------------------------
 
 To create a working adapter, implement following methods:
 

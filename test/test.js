@@ -304,7 +304,7 @@ async function suite(prepare) {
   await delay(1500);
   await Promise.all([
     p,
-    assert.rejects(sync2.syncNow, {code: "EEXIST"})
+    assert.rejects(() => sync2.syncNow(false), {code: "EEXIST"})
   ]);
 
   options.fetchDelay = 0;
@@ -367,7 +367,7 @@ describe("functional", () => {
           delete data[_id];
         }
       }),
-      onError: sinon.spy(),
+      onWarn: sinon.spy(),
       onFirstSync: sinon.spy(() => {
         for (const doc of Object.values(data)) {
           // eslint-disable-next-line no-use-before-define

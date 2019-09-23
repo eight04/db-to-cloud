@@ -97,16 +97,14 @@ function dbToCloud({
   onGet,
   onPut,
   onDelete,
-  onError,
   onFirstSync,
+  onWarn = console.error,
   compareRevision,
   getState,
   setState,
-  period = 5,
   lockExpire = 60
 }) {
   let drive;
-  let timer;
   let state;
   let meta;
   const changeCache = new Map;
@@ -141,7 +139,6 @@ function dbToCloud({
   async function stop() {
     state.enabled = false;
     await lock.write(async () => {
-      clearTimeout(timer);
       if (drive.uninit) {
         await drive.uninit();
       }
@@ -185,7 +182,7 @@ function dbToCloud({
           doc = await drive.get(`docs/${id}.json`);
         } catch (err) {
           if (err.code === "ENOENT") {
-            await onError(new Error(`Cannot find ${id}. Is it deleted without updating the history?`));
+            onWarn(`Cannot find ${id}. Is it deleted without updating the history?`);
             continue;
           }
           throw err;
@@ -268,41 +265,24 @@ function dbToCloud({
     try {
       await syncPull();
       await syncPush();
-    } catch (err) {
-      await onError(err);
-      throw err;
     } finally {
       await drive.releaseLock();
     }
   }
   
-  async function syncNow(peek = false) {
+  async function syncNow(peek = true) {
     if (!state.enabled) {
       throw new Error("Cannot sync now, the sync is not enabled");
     }
     await lock.write(async () => {
-      try {
-        if (peek && !state.queue.length) {
-          const changed = await drive.peekChanges(meta);
-          if (!changed) {
-            return;
-          }
+      if (!state.queue.length && peek && meta) {
+        const changed = await drive.peekChanges(meta);
+        if (!changed) {
+          return;
         }
-        await sync();
-      } finally {
-        schedule();
       }
+      await sync();
     });
-  }
-  
-  function schedule() {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      if (lock.length) {
-        return;
-      }
-      syncNow(true);
-    }, period * 60 * 1000);
   }
   
   function put(_id, _rev) {
