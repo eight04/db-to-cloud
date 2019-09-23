@@ -255,7 +255,9 @@ When `peekChanges` is `true`, the controller calls `cloud.peekChanges` to check 
 Drives
 -------
 
-The library already implemented 5 cloud drive adapters.
+The library includes 5 cloud drive adapters.
+
+Various adapters require browser builtins (e.g. `fetch`, `FormData`, `Blob`). You can check how do we implement such features in Node.js by looking into the test file.
 
 ### fsDrive
 
@@ -268,7 +270,7 @@ fsDrive({
 
 This adapter stores data to local disk.
 
-`getFs` defaults to `() => import("fs").then(fs => fs.promises)`.
+The browser build doesn't include this adapter.
 
 ### dropbox
 

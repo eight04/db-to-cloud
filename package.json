@@ -12,7 +12,6 @@
   ],
   "scripts": {
     "lint": "eslint **/*.js --cache",
-    "nyc": "nyc --reporter=html mocha",
     "test": "npm run lint && c8 --reporter=lcov mocha",
     "preversion": "npm test",
     "postversion": "git push --follow-tags && npm publish",
@@ -57,6 +56,8 @@
     "node": ">=8"
   },
   "files": [
-    "drive"
-  ]
+    "drive",
+    "dist"
+  ],
+  "unpkg": "dist/db-to-cloud.min.js"
 }
