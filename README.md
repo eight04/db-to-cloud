@@ -87,9 +87,8 @@ const sync = dbToCloud({
 });
 
 const cloud = google({
-  folder: '_MY_DB_DATA_',
   getAccessToken: async () => {
-    // implement hooks to authorize the cloud
+    // implement a token manager to authorize the cloud
     // ...
     return token;
   }
@@ -104,7 +103,8 @@ try {
   // ...
 }
 
-syncTimer = setInterval(sync.syncNow, 30 * 60 * 1000); // trigger sync every 30 minutes
+// trigger sync every 30 minutes
+let syncTimer = setInterval(sync.syncNow, 30 * 60 * 1000);
 ```
 
 ### Update the cloud when manipulating the database
@@ -132,7 +132,7 @@ clearInterval(syncTimer);
 await sync.stop();
 
 const newDrive = github({
-  user: "eight04",
+  owner: "eight04",
   repo: "_MY_DB_DATA_",
   async getAccessToken() {
     // ...
