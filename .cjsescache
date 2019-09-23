@@ -1,0 +1,8 @@
+[
+  "drive/dropbox.js",
+  "drive/github.js",
+  "drive/google.js",
+  "drive/onedrive.js",
+  "node_modules/universal-base64/dist/browser.js",
+  "shim/empty.js"
+]

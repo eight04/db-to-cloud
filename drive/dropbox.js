@@ -25,7 +25,8 @@ function testErrorSummary(err, text) {
 function createDrive({
   getAccessToken,
   clientId,
-  fetch: _fetch = fetch
+  fetch: _fetch = fetch,
+  getDropbox = () => require("dropbox").Dropbox
 }) {
   let dropbox;
   return {
@@ -39,7 +40,7 @@ function createDrive({
   };
   
   async function init() {
-    const {Dropbox} = await Promise.resolve(require("dropbox"));
+    const Dropbox = await getDropbox();
     dropbox = new Dropbox({
       fetch: _fetch,
       clientId

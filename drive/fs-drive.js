@@ -1,6 +1,6 @@
 function createDrive({
   folder,
-  getFs = () => Promise.resolve(require("fs")).then(fs => fs.promises)
+  getFs = () => require("fs").promises
 }) {
   let fs;
   let path;

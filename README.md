@@ -25,10 +25,8 @@ npm install db-to-cloud
 *unpkg*
 
 ```html
-<script src="https://unpkg.com/db-to-cloud/dist/web/db-to-cloud.min.js"></script>
-
-<!-- or use the ES module -->
-<script src="https://unpkg.com/db-to-cloud/dist/es/db-to-cloud.min.js" type="module"></script>
+<!-- export to global variable "dbToCloud" -->
+<script src="https://unpkg.com/db-to-cloud/dist/db-to-cloud.min.js"></script>
 ```
 
 Usage
@@ -264,7 +262,7 @@ The library already implemented 5 cloud drive adapters.
 ```js
 fsDrive({
   folder: String,
-  getFs?: async () => fsModule.promises
+  getFs?: async () => fs.promises
 }) => CloudAdapter
 ```
 
@@ -277,6 +275,7 @@ This adapter stores data to local disk.
 ```js
 dropbox({
   getAccessToken: async () => token: String,
+  getDropbox?: async () => Dropbox,
   clientId: String,
   fetch?
 }) => CloudAdapter
@@ -284,17 +283,22 @@ dropbox({
 
 This adapter stores data to Dropbox.
 
+The browser build doesn't include [dropbox SDK](https://github.com/dropbox/dropbox-sdk-js), you have to send the `Dropbox` class to the adapter manually.
+
 ### github
 
 ```js
 github({
   getAccessToken: async () => token: String,
+  getOctokit?: async () => Octokit
   owner: String,
   repo: String
 }) => CloudAdapter
 ```
 
 This adapter stores data to Github repository `owner/repo`.
+
+The browser build doesn't include [octokit REST API](https://github.com/octokit/rest.js), you have to send the `Octokit` class to the adapter manually.
 
 ### google
 

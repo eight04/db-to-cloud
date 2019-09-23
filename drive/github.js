@@ -5,7 +5,12 @@ const {CustomError} = require("./error");
 function createDrive({
   owner,
   repo,
-  getAccessToken
+  getAccessToken,
+  getOctokit = () => {
+    const Octokit = require("@octokit/rest");
+    const throttlingPlugin = require("@octokit/plugin-throttling");
+    return Octokit.plugin(throttlingPlugin);
+  }
 }) {
   let octokit;
   const shaCache = new Map;
@@ -17,7 +22,6 @@ function createDrive({
     post,
     delete: delete_,
     list,
-    api: () => octokit,
     shaCache
   };
   for (const [key, fn] of Object.entries(api)) {
@@ -38,7 +42,7 @@ function createDrive({
   return api;
   
   async function init() {
-    const {Octokit} = await Promise.resolve(require("./github-core"));
+    const Octokit = await getOctokit();
     octokit = new Octokit({
       async auth() {
         return `token ${await getAccessToken()}`;
