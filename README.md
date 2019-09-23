@@ -432,6 +432,6 @@ If this method is not implemented, the library `getMeta()` and check if the meta
 Changelog
 ---------
 
-* 0.1.0 (Aug 28, 2018)
+* 0.1.0 (Sep 24, 2019)
 
   - First release.
