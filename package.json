@@ -1,6 +1,6 @@
 {
   "name": "db-to-cloud",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Synchronize your database with a cloud drive i.e. Dropbox, Google Drive, OneDrive, Github, etc.",
   "author": "eight04 <eight04@gmail.com>",
   "license": "MIT",

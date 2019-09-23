@@ -355,7 +355,7 @@ var dbToCloud = (function (exports) {
     owner,
     repo,
     getAccessToken,
-    getOctoKit = () => {
+    getOctokit = () => {
       const _local_Octokit = Octokit;
       const throttlingPlugin = octokitPluginThrottling;
       return _local_Octokit.plugin(throttlingPlugin);
@@ -442,7 +442,7 @@ var dbToCloud = (function (exports) {
           while (1) switch (_context3.prev = _context3.next) {
             case 0:
               _context3.next = 2;
-              return getOctoKit();
+              return getOctokit();
 
             case 2:
               _local_Octokit = _context3.sent;
