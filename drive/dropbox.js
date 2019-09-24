@@ -26,7 +26,8 @@ function createDrive({
   getAccessToken,
   clientId,
   fetch: _fetch = fetch,
-  getDropbox = () => require("dropbox").Dropbox
+  getDropbox = async () => Promise.resolve(require("dropbox"))
+    .then(m => m.Dropbox || m.default.Dropbox)
 }) {
   let dropbox;
   return {

@@ -6,10 +6,11 @@ function createDrive({
   owner,
   repo,
   getAccessToken,
-  getOctokit = () => {
-    const Octokit = require("@octokit/rest");
-    const throttlingPlugin = require("@octokit/plugin-throttling");
-    return Octokit.plugin(throttlingPlugin);
+  getOctokit = async () => {
+    const octokit = await Promise.resolve(require("@octokit/rest"));
+    const Octokit = octokit.Octokit || octokit.default && octokit.default.Octokit || octokit;
+    const throttlingPlugin = await Promise.resolve(require("@octokit/plugin-throttling"));
+    return Octokit.plugin(throttlingPlugin.default || throttlingPlugin);
   }
 }) {
   let octokit;
