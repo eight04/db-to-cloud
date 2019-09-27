@@ -357,32 +357,12 @@ var dbToCloud = (function (exports) {
     getAccessToken,
     getOctokit =
     /*#__PURE__*/
-    _asyncToGenerator(
-    /*#__PURE__*/
-    regeneratorRuntime.mark(function _callee() {
-      var octokit, Octokit, throttlingPlugin;
-      return regeneratorRuntime.wrap(function _callee$(_context) {
-        while (1) switch (_context.prev = _context.next) {
-          case 0:
-            _context.next = 2;
-            return Promise.resolve(Octokit);
-
-          case 2:
-            octokit = _context.sent;
-            Octokit = octokit.Octokit || octokit.default && octokit.default.Octokit || octokit;
-            _context.next = 6;
-            return Promise.resolve(octokitPluginThrottling);
-
-          case 6:
-            throttlingPlugin = _context.sent;
-            return _context.abrupt("return", Octokit.plugin(throttlingPlugin.default || throttlingPlugin));
-
-          case 8:
-          case "end":
-            return _context.stop();
-        }
-      }, _callee);
-    }))
+    _asyncToGenerator(function* () {
+      const octokit = yield Promise.resolve(Octokit);
+      const Octokit = octokit.Octokit || octokit.default && octokit.default.Octokit || octokit;
+      const throttlingPlugin = yield Promise.resolve(octokitPluginThrottling);
+      return Octokit.plugin(throttlingPlugin.default || throttlingPlugin);
+    })
   }) {
     let octokit;
     const shaCache = new Map();
@@ -409,39 +389,17 @@ var dbToCloud = (function (exports) {
       api[key] =
       /*#__PURE__*/
       function () {
-        var _ref2 = _asyncToGenerator(
-        /*#__PURE__*/
-        regeneratorRuntime.mark(function _callee2(...args) {
-          return regeneratorRuntime.wrap(function _callee2$(_context2) {
-            while (1) switch (_context2.prev = _context2.next) {
-              case 0:
-                _context2.prev = 0;
-                _context2.next = 3;
-                return fn(...args);
-
-              case 3:
-                return _context2.abrupt("return", _context2.sent);
-
-              case 6:
-                _context2.prev = 6;
-                _context2.t0 = _context2["catch"](0);
-
-                if (!(_context2.t0.status === 404)) {
-                  _context2.next = 10;
-                  break;
-                }
-
-                throw new CustomError("ENOENT", _context2.t0);
-
-              case 10:
-                throw _context2.t0;
-
-              case 11:
-              case "end":
-                return _context2.stop();
+        var _ref2 = _asyncToGenerator(function* (...args) {
+          try {
+            return yield fn(...args);
+          } catch (err) {
+            if (err.status === 404) {
+              throw new CustomError("ENOENT", err);
             }
-          }, _callee2, null, [[0, 6]]);
-        }));
+
+            throw err;
+          }
+        });
 
         return function () {
           return _ref2.apply(this, arguments);
@@ -456,63 +414,27 @@ var dbToCloud = (function (exports) {
     }
 
     function _init() {
-      _init = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee4() {
-        var Octokit;
-        return regeneratorRuntime.wrap(function _callee4$(_context4) {
-          while (1) switch (_context4.prev = _context4.next) {
-            case 0:
-              _context4.next = 2;
-              return getOctokit();
+      _init = _asyncToGenerator(function* () {
+        const Octokit = yield getOctokit();
+        octokit = new Octokit({
+          auth() {
+            return _asyncToGenerator(function* () {
+              return "token ".concat((yield getAccessToken()));
+            })();
+          },
 
-            case 2:
-              Octokit = _context4.sent;
-              _context4.t0 = Octokit;
-              _context4.t1 = {
-                onAbuseLimit: (retryAfter, options) => {
-                  console.warn("Abuse detected for request ".concat(options.method, " ").concat(options.url));
-                  return false;
-                },
-                onRateLimit: (retryAfter, options) => {
-                  console.warn("Request quota exhausted for request ".concat(options.method, " ").concat(options.url));
-                  return false;
-                }
-              };
-              _context4.t2 = {
-                auth() {
-                  return _asyncToGenerator(
-                  /*#__PURE__*/
-                  regeneratorRuntime.mark(function _callee3() {
-                    return regeneratorRuntime.wrap(function _callee3$(_context3) {
-                      while (1) switch (_context3.prev = _context3.next) {
-                        case 0:
-                          _context3.t0 = "token ";
-                          _context3.next = 3;
-                          return getAccessToken();
-
-                        case 3:
-                          _context3.t1 = _context3.sent;
-                          return _context3.abrupt("return", _context3.t0.concat.call(_context3.t0, _context3.t1));
-
-                        case 5:
-                        case "end":
-                          return _context3.stop();
-                      }
-                    }, _callee3);
-                  }))();
-                },
-
-                throttle: _context4.t1
-              };
-              octokit = new _context4.t0(_context4.t2);
-
-            case 7:
-            case "end":
-              return _context4.stop();
+          throttle: {
+            onAbuseLimit: (retryAfter, options) => {
+              console.warn("Abuse detected for request ".concat(options.method, " ").concat(options.url));
+              return false;
+            },
+            onRateLimit: (retryAfter, options) => {
+              console.warn("Request quota exhausted for request ".concat(options.method, " ").concat(options.url));
+              return false;
+            }
           }
-        }, _callee4);
-      }));
+        });
+      });
       return _init.apply(this, arguments);
     }
 
@@ -521,77 +443,41 @@ var dbToCloud = (function (exports) {
     }
 
     function _list() {
-      _list = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee5(file) {
-        var result, names, _iteratorNormalCompletion, _didIteratorError, _iteratorError, _iterator, _step, item;
+      _list = _asyncToGenerator(function* (file) {
+        // FIXME: it seems that it will fail when containing more than 1000 items
+        const result = yield octokit.repos.getContents({
+          owner,
+          repo,
+          path: file
+        });
+        const names = [];
+        var _iteratorNormalCompletion = true;
+        var _didIteratorError = false;
+        var _iteratorError = undefined;
 
-        return regeneratorRuntime.wrap(function _callee5$(_context5) {
-          while (1) switch (_context5.prev = _context5.next) {
-            case 0:
-              _context5.next = 2;
-              return octokit.repos.getContents({
-                owner,
-                repo,
-                path: file
-              });
-
-            case 2:
-              result = _context5.sent;
-              names = [];
-              _iteratorNormalCompletion = true;
-              _didIteratorError = false;
-              _iteratorError = undefined;
-              _context5.prev = 7;
-
-              for (_iterator = result.data[Symbol.iterator](); !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-                item = _step.value;
-                names.push(item.name);
-                shaCache.set(item.path, item.sha);
-              }
-
-              _context5.next = 15;
-              break;
-
-            case 11:
-              _context5.prev = 11;
-              _context5.t0 = _context5["catch"](7);
-              _didIteratorError = true;
-              _iteratorError = _context5.t0;
-
-            case 15:
-              _context5.prev = 15;
-              _context5.prev = 16;
-
-              if (!_iteratorNormalCompletion && _iterator.return != null) {
-                _iterator.return();
-              }
-
-            case 18:
-              _context5.prev = 18;
-
-              if (!_didIteratorError) {
-                _context5.next = 21;
-                break;
-              }
-
-              throw _iteratorError;
-
-            case 21:
-              return _context5.finish(18);
-
-            case 22:
-              return _context5.finish(15);
-
-            case 23:
-              return _context5.abrupt("return", names);
-
-            case 24:
-            case "end":
-              return _context5.stop();
+        try {
+          for (var _iterator = result.data[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            const item = _step.value;
+            names.push(item.name);
+            shaCache.set(item.path, item.sha);
           }
-        }, _callee5, null, [[7, 11, 15, 23], [16,, 18, 22]]);
-      }));
+        } catch (err) {
+          _didIteratorError = true;
+          _iteratorError = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion && _iterator.return != null) {
+              _iterator.return();
+            }
+          } finally {
+            if (_didIteratorError) {
+              throw _iteratorError;
+            }
+          }
+        }
+
+        return names;
+      });
       return _list.apply(this, arguments);
     }
 
@@ -600,31 +486,15 @@ var dbToCloud = (function (exports) {
     }
 
     function _get() {
-      _get = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee6(file) {
-        var result;
-        return regeneratorRuntime.wrap(function _callee6$(_context6) {
-          while (1) switch (_context6.prev = _context6.next) {
-            case 0:
-              _context6.next = 2;
-              return octokit.repos.getContents({
-                owner,
-                repo,
-                path: file
-              });
-
-            case 2:
-              result = _context6.sent;
-              shaCache.set(result.data.path, result.data.sha);
-              return _context6.abrupt("return", _module_exports_.decode(result.data.content));
-
-            case 5:
-            case "end":
-              return _context6.stop();
-          }
-        }, _callee6);
-      }));
+      _get = _asyncToGenerator(function* (file) {
+        const result = yield octokit.repos.getContents({
+          owner,
+          repo,
+          path: file
+        });
+        shaCache.set(result.data.path, result.data.sha);
+        return _module_exports_.decode(result.data.content);
+      });
       return _get.apply(this, arguments);
     }
 
@@ -633,65 +503,34 @@ var dbToCloud = (function (exports) {
     }
 
     function _put() {
-      _put = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee7(file, data) {
-        var options, result;
-        return regeneratorRuntime.wrap(function _callee7$(_context7) {
-          while (1) switch (_context7.prev = _context7.next) {
-            case 0:
-              options = {
-                owner,
-                repo,
-                path: file,
-                message: "",
-                content: _module_exports_.encode(data)
-              };
+      _put = _asyncToGenerator(function* (file, data) {
+        const options = {
+          owner,
+          repo,
+          path: file,
+          message: "",
+          content: _module_exports_.encode(data)
+        };
 
-              if (shaCache.has(file)) {
-                options.sha = shaCache.get(file);
-              }
+        if (shaCache.has(file)) {
+          options.sha = shaCache.get(file);
+        }
 
-              _context7.prev = 2;
-              _context7.next = 5;
-              return octokit.repos.createOrUpdateFile(options);
+        let result;
 
-            case 5:
-              result = _context7.sent;
-              _context7.next = 17;
-              break;
-
-            case 8:
-              _context7.prev = 8;
-              _context7.t0 = _context7["catch"](2);
-
-              if (!(_context7.t0.status === 422 && !options.sha)) {
-                _context7.next = 16;
-                break;
-              }
-
-              _context7.next = 13;
-              return get(file);
-
-            case 13:
-              _context7.next = 15;
-              return put(file, data);
-
-            case 15:
-              return _context7.abrupt("return", _context7.sent);
-
-            case 16:
-              throw _context7.t0;
-
-            case 17:
-              shaCache.set(file, result.data.content.sha);
-
-            case 18:
-            case "end":
-              return _context7.stop();
+        try {
+          result = yield octokit.repos.createOrUpdateFile(options);
+        } catch (err) {
+          if (err.status === 422 && !options.sha) {
+            yield get(file);
+            return yield put(file, data);
           }
-        }, _callee7, null, [[2, 8]]);
-      }));
+
+          throw err;
+        }
+
+        shaCache.set(file, result.data.content.sha);
+      });
       return _put.apply(this, arguments);
     }
 
@@ -700,51 +539,27 @@ var dbToCloud = (function (exports) {
     }
 
     function _post() {
-      _post = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee8(file, data) {
-        var result;
-        return regeneratorRuntime.wrap(function _callee8$(_context8) {
-          while (1) switch (_context8.prev = _context8.next) {
-            case 0:
-              _context8.prev = 0;
-              _context8.next = 3;
-              return octokit.repos.createOrUpdateFile({
-                owner,
-                repo,
-                path: file,
-                message: "",
-                content: _module_exports_.encode(data)
-              });
+      _post = _asyncToGenerator(function* (file, data) {
+        let result;
 
-            case 3:
-              result = _context8.sent;
-              _context8.next = 11;
-              break;
-
-            case 6:
-              _context8.prev = 6;
-              _context8.t0 = _context8["catch"](0);
-
-              if (!(_context8.t0.status === 422)) {
-                _context8.next = 10;
-                break;
-              }
-
-              throw new CustomError("EEXIST", _context8.t0);
-
-            case 10:
-              throw _context8.t0;
-
-            case 11:
-              shaCache.set(file, result.data.content.sha);
-
-            case 12:
-            case "end":
-              return _context8.stop();
+        try {
+          result = yield octokit.repos.createOrUpdateFile({
+            owner,
+            repo,
+            path: file,
+            message: "",
+            content: _module_exports_.encode(data)
+          });
+        } catch (err) {
+          if (err.status === 422) {
+            throw new CustomError("EEXIST", err);
           }
-        }, _callee8, null, [[0, 6]]);
-      }));
+
+          throw err;
+        }
+
+        shaCache.set(file, result.data.content.sha);
+      });
       return _post.apply(this, arguments);
     }
 
@@ -753,58 +568,30 @@ var dbToCloud = (function (exports) {
     }
 
     function _delete_() {
-      _delete_ = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee9(file) {
-        var sha;
-        return regeneratorRuntime.wrap(function _callee9$(_context9) {
-          while (1) switch (_context9.prev = _context9.next) {
-            case 0:
-              sha = shaCache.has(file);
+      _delete_ = _asyncToGenerator(function* (file) {
+        const sha = shaCache.has(file);
 
-              if (sha) {
-                _context9.next = 4;
-                break;
-              }
+        if (!sha) {
+          yield get(file);
+        }
 
-              _context9.next = 4;
-              return get(file);
+        try {
+          yield octokit.repos.deleteFile({
+            owner,
+            repo,
+            path: file,
+            message: "",
+            sha: shaCache.get(file)
+          });
+        } catch (err) {
+          if (err.status === 404) {
+            return;
+          } // FIXME: do we have to handle 422 errors?
 
-            case 4:
-              _context9.prev = 4;
-              _context9.next = 7;
-              return octokit.repos.deleteFile({
-                owner,
-                repo,
-                path: file,
-                message: "",
-                sha: shaCache.get(file)
-              });
 
-            case 7:
-              _context9.next = 14;
-              break;
-
-            case 9:
-              _context9.prev = 9;
-              _context9.t0 = _context9["catch"](4);
-
-              if (!(_context9.t0.status === 404)) {
-                _context9.next = 13;
-                break;
-              }
-
-              return _context9.abrupt("return");
-
-            case 13:
-              throw _context9.t0;
-
-            case 14:
-            case "end":
-              return _context9.stop();
-          }
-        }, _callee9, null, [[4, 9]]);
-      }));
+          throw err;
+        }
+      });
       return _delete_.apply(this, arguments);
     }
   }
@@ -841,20 +628,9 @@ var dbToCloud = (function (exports) {
     fetch: _fetch = fetch,
     getDropbox =
     /*#__PURE__*/
-    _asyncToGenerator(
-    /*#__PURE__*/
-    regeneratorRuntime.mark(function _callee() {
-      return regeneratorRuntime.wrap(function _callee$(_context) {
-        while (1) switch (_context.prev = _context.next) {
-          case 0:
-            return _context.abrupt("return", Promise.resolve(dropbox).then(m => m.Dropbox || m.default.Dropbox));
-
-          case 1:
-          case "end":
-            return _context.stop();
-        }
-      }, _callee);
-    }))
+    _asyncToGenerator(function* () {
+      return Promise.resolve(dropbox).then(m => m.Dropbox || m.default.Dropbox);
+    })
   }) {
     let dropbox;
     return {
@@ -872,37 +648,14 @@ var dbToCloud = (function (exports) {
     }
 
     function _init() {
-      _init = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee2() {
-        var Dropbox;
-        return regeneratorRuntime.wrap(function _callee2$(_context2) {
-          while (1) switch (_context2.prev = _context2.next) {
-            case 0:
-              _context2.next = 2;
-              return getDropbox();
-
-            case 2:
-              Dropbox = _context2.sent;
-              dropbox = new Dropbox({
-                fetch: _fetch,
-                clientId
-              });
-              _context2.t0 = dropbox;
-              _context2.next = 7;
-              return getAccessToken(dropbox);
-
-            case 7:
-              _context2.t1 = _context2.sent;
-
-              _context2.t0.setAccessToken.call(_context2.t0, _context2.t1);
-
-            case 9:
-            case "end":
-              return _context2.stop();
-          }
-        }, _callee2);
-      }));
+      _init = _asyncToGenerator(function* () {
+        const Dropbox = yield getDropbox();
+        dropbox = new Dropbox({
+          fetch: _fetch,
+          clientId
+        });
+        dropbox.setAccessToken((yield getAccessToken(dropbox)));
+      });
       return _init.apply(this, arguments);
     }
 
@@ -911,146 +664,73 @@ var dbToCloud = (function (exports) {
     }
 
     function _list() {
-      _list = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee3(file) {
-        var names, result, _iteratorNormalCompletion, _didIteratorError, _iteratorError, _iterator, _step, entry, cursor, _iteratorNormalCompletion2, _didIteratorError2, _iteratorError2, _iterator2, _step2;
+      _list = _asyncToGenerator(function* (file) {
+        const names = [];
+        let result = yield dropbox.filesListFolder({
+          path: "/".concat(file)
+        });
+        var _iteratorNormalCompletion = true;
+        var _didIteratorError = false;
+        var _iteratorError = undefined;
 
-        return regeneratorRuntime.wrap(function _callee3$(_context3) {
-          while (1) switch (_context3.prev = _context3.next) {
-            case 0:
-              names = [];
-              _context3.next = 3;
-              return dropbox.filesListFolder({
-                path: "/".concat(file)
-              });
-
-            case 3:
-              result = _context3.sent;
-              _iteratorNormalCompletion = true;
-              _didIteratorError = false;
-              _iteratorError = undefined;
-              _context3.prev = 7;
-
-              for (_iterator = result.entries[Symbol.iterator](); !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-                entry = _step.value;
-                names.push(entry.name);
-              }
-
-              _context3.next = 15;
-              break;
-
-            case 11:
-              _context3.prev = 11;
-              _context3.t0 = _context3["catch"](7);
-              _didIteratorError = true;
-              _iteratorError = _context3.t0;
-
-            case 15:
-              _context3.prev = 15;
-              _context3.prev = 16;
-
-              if (!_iteratorNormalCompletion && _iterator.return != null) {
-                _iterator.return();
-              }
-
-            case 18:
-              _context3.prev = 18;
-
-              if (!_didIteratorError) {
-                _context3.next = 21;
-                break;
-              }
-
+        try {
+          for (var _iterator = result.entries[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            const entry = _step.value;
+            names.push(entry.name);
+          }
+        } catch (err) {
+          _didIteratorError = true;
+          _iteratorError = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion && _iterator.return != null) {
+              _iterator.return();
+            }
+          } finally {
+            if (_didIteratorError) {
               throw _iteratorError;
+            }
+          }
+        }
 
-            case 21:
-              return _context3.finish(18);
+        if (!result.has_more) {
+          return names;
+        }
 
-            case 22:
-              return _context3.finish(15);
+        let cursor = result.cursor;
 
-            case 23:
-              if (result.has_more) {
-                _context3.next = 25;
-                break;
-              }
+        while (result.has_more) {
+          result = yield dropbox.filesListFolderContinue({
+            cursor
+          });
+          cursor = result.cursor;
+          var _iteratorNormalCompletion2 = true;
+          var _didIteratorError2 = false;
+          var _iteratorError2 = undefined;
 
-              return _context3.abrupt("return", names);
-
-            case 25:
-              cursor = result.cursor;
-
-            case 26:
-              if (!result.has_more) {
-                _context3.next = 52;
-                break;
-              }
-
-              _context3.next = 29;
-              return dropbox.filesListFolderContinue({
-                cursor
-              });
-
-            case 29:
-              result = _context3.sent;
-              cursor = result.cursor;
-              _iteratorNormalCompletion2 = true;
-              _didIteratorError2 = false;
-              _iteratorError2 = undefined;
-              _context3.prev = 34;
-
-              for (_iterator2 = result.entries[Symbol.iterator](); !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
-                entry = _step2.value;
-                names.push(entry.name);
-              }
-
-              _context3.next = 42;
-              break;
-
-            case 38:
-              _context3.prev = 38;
-              _context3.t1 = _context3["catch"](34);
-              _didIteratorError2 = true;
-              _iteratorError2 = _context3.t1;
-
-            case 42:
-              _context3.prev = 42;
-              _context3.prev = 43;
-
+          try {
+            for (var _iterator2 = result.entries[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+              const entry = _step2.value;
+              names.push(entry.name);
+            }
+          } catch (err) {
+            _didIteratorError2 = true;
+            _iteratorError2 = err;
+          } finally {
+            try {
               if (!_iteratorNormalCompletion2 && _iterator2.return != null) {
                 _iterator2.return();
               }
-
-            case 45:
-              _context3.prev = 45;
-
-              if (!_didIteratorError2) {
-                _context3.next = 48;
-                break;
+            } finally {
+              if (_didIteratorError2) {
+                throw _iteratorError2;
               }
-
-              throw _iteratorError2;
-
-            case 48:
-              return _context3.finish(45);
-
-            case 49:
-              return _context3.finish(42);
-
-            case 50:
-              _context3.next = 26;
-              break;
-
-            case 52:
-              return _context3.abrupt("return", names);
-
-            case 53:
-            case "end":
-              return _context3.stop();
+            }
           }
-        }, _callee3, null, [[7, 11, 15, 23], [16,, 18, 22], [34, 38, 42, 50], [43,, 45, 49]]);
-      }));
+        }
+
+        return names;
+      });
       return _list.apply(this, arguments);
     }
 
@@ -1059,59 +739,27 @@ var dbToCloud = (function (exports) {
     }
 
     function _get() {
-      _get = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee4(file) {
-        var result;
-        return regeneratorRuntime.wrap(function _callee4$(_context4) {
-          while (1) switch (_context4.prev = _context4.next) {
-            case 0:
-              _context4.prev = 0;
-              _context4.next = 3;
-              return dropbox.filesDownload({
-                path: "/".concat(file)
-              });
+      _get = _asyncToGenerator(function* (file) {
+        let result;
 
-            case 3:
-              result = _context4.sent;
-              _context4.next = 11;
-              break;
-
-            case 6:
-              _context4.prev = 6;
-              _context4.t0 = _context4["catch"](0);
-
-              if (!testErrorSummary(_context4.t0, "not_found")) {
-                _context4.next = 10;
-                break;
-              }
-
-              throw new CustomError("ENOENT", _context4.t0);
-
-            case 10:
-              throw _context4.t0;
-
-            case 11:
-              if (!result.fileBinary) {
-                _context4.next = 13;
-                break;
-              }
-
-              return _context4.abrupt("return", result.fileBinary.toString());
-
-            case 13:
-              _context4.next = 15;
-              return blobToText(result.fileBlob);
-
-            case 15:
-              return _context4.abrupt("return", _context4.sent);
-
-            case 16:
-            case "end":
-              return _context4.stop();
+        try {
+          result = yield dropbox.filesDownload({
+            path: "/".concat(file)
+          });
+        } catch (err) {
+          if (testErrorSummary(err, "not_found")) {
+            throw new CustomError("ENOENT", err);
           }
-        }, _callee4, null, [[0, 6]]);
-      }));
+
+          throw err;
+        }
+
+        if (result.fileBinary) {
+          return result.fileBinary.toString();
+        }
+
+        return yield blobToText(result.fileBlob);
+      });
       return _get.apply(this, arguments);
     }
 
@@ -1120,26 +768,14 @@ var dbToCloud = (function (exports) {
     }
 
     function _put() {
-      _put = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee5(file, data) {
-        return regeneratorRuntime.wrap(function _callee5$(_context5) {
-          while (1) switch (_context5.prev = _context5.next) {
-            case 0:
-              _context5.next = 2;
-              return dropbox.filesUpload({
-                contents: data,
-                path: "/".concat(file),
-                mode: "overwrite",
-                autorename: false
-              });
-
-            case 2:
-            case "end":
-              return _context5.stop();
-          }
-        }, _callee5);
-      }));
+      _put = _asyncToGenerator(function* (file, data) {
+        yield dropbox.filesUpload({
+          contents: data,
+          path: "/".concat(file),
+          mode: "overwrite",
+          autorename: false
+        });
+      });
       return _put.apply(this, arguments);
     }
 
@@ -1148,45 +784,22 @@ var dbToCloud = (function (exports) {
     }
 
     function _post() {
-      _post = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee6(file, data) {
-        return regeneratorRuntime.wrap(function _callee6$(_context6) {
-          while (1) switch (_context6.prev = _context6.next) {
-            case 0:
-              _context6.prev = 0;
-              _context6.next = 3;
-              return dropbox.filesUpload({
-                contents: data,
-                path: "/".concat(file),
-                mode: "add",
-                autorename: false
-              });
-
-            case 3:
-              _context6.next = 10;
-              break;
-
-            case 5:
-              _context6.prev = 5;
-              _context6.t0 = _context6["catch"](0);
-
-              if (!testErrorSummary(_context6.t0, "conflict")) {
-                _context6.next = 9;
-                break;
-              }
-
-              throw new CustomError("EEXIST", _context6.t0);
-
-            case 9:
-              throw _context6.t0;
-
-            case 10:
-            case "end":
-              return _context6.stop();
+      _post = _asyncToGenerator(function* (file, data) {
+        try {
+          yield dropbox.filesUpload({
+            contents: data,
+            path: "/".concat(file),
+            mode: "add",
+            autorename: false
+          });
+        } catch (err) {
+          if (testErrorSummary(err, "conflict")) {
+            throw new CustomError("EEXIST", err);
           }
-        }, _callee6, null, [[0, 5]]);
-      }));
+
+          throw err;
+        }
+      });
       return _post.apply(this, arguments);
     }
 
@@ -1195,42 +808,19 @@ var dbToCloud = (function (exports) {
     }
 
     function _delete_() {
-      _delete_ = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee7(file) {
-        return regeneratorRuntime.wrap(function _callee7$(_context7) {
-          while (1) switch (_context7.prev = _context7.next) {
-            case 0:
-              _context7.prev = 0;
-              _context7.next = 3;
-              return dropbox.filesDelete({
-                path: "/".concat(file)
-              });
-
-            case 3:
-              _context7.next = 10;
-              break;
-
-            case 5:
-              _context7.prev = 5;
-              _context7.t0 = _context7["catch"](0);
-
-              if (!testErrorSummary(_context7.t0, "not_found")) {
-                _context7.next = 9;
-                break;
-              }
-
-              return _context7.abrupt("return");
-
-            case 9:
-              throw _context7.t0;
-
-            case 10:
-            case "end":
-              return _context7.stop();
+      _delete_ = _asyncToGenerator(function* (file) {
+        try {
+          yield dropbox.filesDelete({
+            path: "/".concat(file)
+          });
+        } catch (err) {
+          if (testErrorSummary(err, "not_found")) {
+            return;
           }
-        }, _callee7, null, [[0, 5]]);
-      }));
+
+          throw err;
+        }
+      });
       return _delete_.apply(this, arguments);
     }
   }
@@ -1253,75 +843,33 @@ var dbToCloud = (function (exports) {
     }
 
     function _query() {
-      _query = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee(_ref) {
-        var _ref$method, method, path, headers, _ref$format, format, args, res, _ref2, error;
+      _query = _asyncToGenerator(function* (_ref) {
+        let _ref$method = _ref.method,
+            method = _ref$method === void 0 ? "GET" : _ref$method,
+            path = _ref.path,
+            headers = _ref.headers,
+            _ref$format = _ref.format,
+            format = _ref$format === void 0 ? "json" : _ref$format,
+            args = _objectWithoutProperties(_ref, ["method", "path", "headers", "format"]);
 
-        return regeneratorRuntime.wrap(function _callee$(_context) {
-          while (1) switch (_context.prev = _context.next) {
-            case 0:
-              _ref$method = _ref.method, method = _ref$method === void 0 ? "GET" : _ref$method, path = _ref.path, headers = _ref.headers, _ref$format = _ref.format, format = _ref$format === void 0 ? "json" : _ref$format, args = _objectWithoutProperties(_ref, ["method", "path", "headers", "format"]);
-              _context.t0 = _fetch;
-              _context.t1 = "https://graph.microsoft.com/v1.0/me/drive/special/approot".concat(path);
-              _context.t2 = _objectSpread2;
-              _context.t3 = method;
-              _context.t4 = _objectSpread2;
-              _context.t5 = "bearer ";
-              _context.next = 9;
-              return getAccessToken();
+        const res = yield _fetch("https://graph.microsoft.com/v1.0/me/drive/special/approot".concat(path), _objectSpread2({
+          method,
+          headers: _objectSpread2({
+            "Authorization": "bearer ".concat((yield getAccessToken()))
+          }, headers)
+        }, args));
 
-            case 9:
-              _context.t6 = _context.sent;
-              _context.t7 = _context.t5.concat.call(_context.t5, _context.t6);
-              _context.t8 = {
-                "Authorization": _context.t7
-              };
-              _context.t9 = headers;
-              _context.t10 = (0, _context.t4)(_context.t8, _context.t9);
-              _context.t11 = {
-                method: _context.t3,
-                headers: _context.t10
-              };
-              _context.t12 = args;
-              _context.t13 = (0, _context.t2)(_context.t11, _context.t12);
-              _context.next = 19;
-              return (0, _context.t0)(_context.t1, _context.t13);
+        if (!res.ok) {
+          const _ref2 = yield res.json(),
+                error = _ref2.error;
 
-            case 19:
-              res = _context.sent;
+          throw new CustomError(error.code, error);
+        }
 
-              if (res.ok) {
-                _context.next = 26;
-                break;
-              }
-
-              _context.next = 23;
-              return res.json();
-
-            case 23:
-              _ref2 = _context.sent;
-              error = _ref2.error;
-              throw new CustomError(error.code, error);
-
-            case 26:
-              if (!format) {
-                _context.next = 30;
-                break;
-              }
-
-              _context.next = 29;
-              return res[format]();
-
-            case 29:
-              return _context.abrupt("return", _context.sent);
-
-            case 30:
-            case "end":
-              return _context.stop();
-          }
-        }, _callee);
-      }));
+        if (format) {
+          return yield res[format]();
+        }
+      });
       return _query.apply(this, arguments);
     }
 
@@ -1330,32 +878,16 @@ var dbToCloud = (function (exports) {
     }
 
     function _list() {
-      _list = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee2(file) {
-        var result;
-        return regeneratorRuntime.wrap(function _callee2$(_context2) {
-          while (1) switch (_context2.prev = _context2.next) {
-            case 0:
-              if (file) {
-                file = ":/".concat(file, ":");
-              }
+      _list = _asyncToGenerator(function* (file) {
+        if (file) {
+          file = ":/".concat(file, ":");
+        }
 
-              _context2.next = 3;
-              return query({
-                path: "".concat(file, "/children?select=name")
-              });
-
-            case 3:
-              result = _context2.sent;
-              return _context2.abrupt("return", result.value.map(i => i.name));
-
-            case 5:
-            case "end":
-              return _context2.stop();
-          }
-        }, _callee2);
-      }));
+        const result = yield query({
+          path: "".concat(file, "/children?select=name")
+        });
+        return result.value.map(i => i.name);
+      });
       return _list.apply(this, arguments);
     }
 
@@ -1364,38 +896,20 @@ var dbToCloud = (function (exports) {
     }
 
     function _get() {
-      _get = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee3(file) {
-        return regeneratorRuntime.wrap(function _callee3$(_context3) {
-          while (1) switch (_context3.prev = _context3.next) {
-            case 0:
-              _context3.prev = 0;
-              _context3.next = 3;
-              return query({
-                path: ":/".concat(file, ":/content"),
-                format: "text"
-              });
-
-            case 3:
-              return _context3.abrupt("return", _context3.sent);
-
-            case 6:
-              _context3.prev = 6;
-              _context3.t0 = _context3["catch"](0);
-
-              if (_context3.t0.code === "itemNotFound") {
-                _context3.t0.code = "ENOENT";
-              }
-
-              throw _context3.t0;
-
-            case 10:
-            case "end":
-              return _context3.stop();
+      _get = _asyncToGenerator(function* (file) {
+        try {
+          return yield query({
+            path: ":/".concat(file, ":/content"),
+            format: "text"
+          });
+        } catch (err) {
+          if (err.code === "itemNotFound") {
+            err.code = "ENOENT";
           }
-        }, _callee3, null, [[0, 6]]);
-      }));
+
+          throw err;
+        }
+      });
       return _get.apply(this, arguments);
     }
 
@@ -1404,28 +918,16 @@ var dbToCloud = (function (exports) {
     }
 
     function _put() {
-      _put = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee4(file, data) {
-        return regeneratorRuntime.wrap(function _callee4$(_context4) {
-          while (1) switch (_context4.prev = _context4.next) {
-            case 0:
-              _context4.next = 2;
-              return query({
-                method: "PUT",
-                path: ":/".concat(file, ":/content"),
-                headers: {
-                  "Content-Type": "text/plain"
-                },
-                body: data
-              });
-
-            case 2:
-            case "end":
-              return _context4.stop();
-          }
-        }, _callee4);
-      }));
+      _put = _asyncToGenerator(function* (file, data) {
+        yield query({
+          method: "PUT",
+          path: ":/".concat(file, ":/content"),
+          headers: {
+            "Content-Type": "text/plain"
+          },
+          body: data
+        });
+      });
       return _put.apply(this, arguments);
     }
 
@@ -1434,43 +936,24 @@ var dbToCloud = (function (exports) {
     }
 
     function _post() {
-      _post = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee5(file, data) {
-        return regeneratorRuntime.wrap(function _callee5$(_context5) {
-          while (1) switch (_context5.prev = _context5.next) {
-            case 0:
-              _context5.prev = 0;
-              _context5.next = 3;
-              return query({
-                method: "PUT",
-                path: ":/".concat(file, ":/content?@microsoft.graph.conflictBehavior=fail"),
-                headers: {
-                  "Content-Type": "text/plain"
-                },
-                body: data
-              });
-
-            case 3:
-              _context5.next = 9;
-              break;
-
-            case 5:
-              _context5.prev = 5;
-              _context5.t0 = _context5["catch"](0);
-
-              if (_context5.t0.code === "nameAlreadyExists") {
-                _context5.t0.code = "EEXIST";
-              }
-
-              throw _context5.t0;
-
-            case 9:
-            case "end":
-              return _context5.stop();
+      _post = _asyncToGenerator(function* (file, data) {
+        try {
+          yield query({
+            method: "PUT",
+            path: ":/".concat(file, ":/content?@microsoft.graph.conflictBehavior=fail"),
+            headers: {
+              "Content-Type": "text/plain"
+            },
+            body: data
+          });
+        } catch (err) {
+          if (err.code === "nameAlreadyExists") {
+            err.code = "EEXIST";
           }
-        }, _callee5, null, [[0, 5]]);
-      }));
+
+          throw err;
+        }
+      });
       return _post.apply(this, arguments);
     }
 
@@ -1479,44 +962,21 @@ var dbToCloud = (function (exports) {
     }
 
     function _delete_() {
-      _delete_ = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee6(file) {
-        return regeneratorRuntime.wrap(function _callee6$(_context6) {
-          while (1) switch (_context6.prev = _context6.next) {
-            case 0:
-              _context6.prev = 0;
-              _context6.next = 3;
-              return query({
-                method: "DELETE",
-                path: ":/".concat(file, ":"),
-                format: null
-              });
-
-            case 3:
-              _context6.next = 10;
-              break;
-
-            case 5:
-              _context6.prev = 5;
-              _context6.t0 = _context6["catch"](0);
-
-              if (!(_context6.t0.code === "itemNotFound")) {
-                _context6.next = 9;
-                break;
-              }
-
-              return _context6.abrupt("return");
-
-            case 9:
-              throw _context6.t0;
-
-            case 10:
-            case "end":
-              return _context6.stop();
+      _delete_ = _asyncToGenerator(function* (file) {
+        try {
+          yield query({
+            method: "DELETE",
+            path: ":/".concat(file, ":"),
+            format: null
+          });
+        } catch (err) {
+          if (err.code === "itemNotFound") {
+            return;
           }
-        }, _callee6, null, [[0, 5]]);
-      }));
+
+          throw err;
+        }
+      });
       return _delete_.apply(this, arguments);
     }
   }
@@ -1551,25 +1011,13 @@ var dbToCloud = (function (exports) {
     }
 
     function _revDelete() {
-      _revDelete = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee(fileId, revId) {
-        return regeneratorRuntime.wrap(function _callee$(_context) {
-          while (1) switch (_context.prev = _context.next) {
-            case 0:
-              _context.next = 2;
-              return query({
-                method: "DELETE",
-                path: "https://www.googleapis.com/drive/v3/files/".concat(fileId, "/revisions/").concat(revId),
-                format: null
-              });
-
-            case 2:
-            case "end":
-              return _context.stop();
-          }
-        }, _callee);
-      }));
+      _revDelete = _asyncToGenerator(function* (fileId, revId) {
+        yield query({
+          method: "DELETE",
+          path: "https://www.googleapis.com/drive/v3/files/".concat(fileId, "/revisions/").concat(revId),
+          format: null
+        });
+      });
       return _revDelete.apply(this, arguments);
     }
 
@@ -1578,87 +1026,43 @@ var dbToCloud = (function (exports) {
     }
 
     function _acquireLock() {
-      _acquireLock = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee2(expire) {
-        var lock, _ref, headRevisionId, result, i, revId, rev;
+      _acquireLock = _asyncToGenerator(function* (expire) {
+        const lock = fileMetaCache.get("lock.json");
 
-        return regeneratorRuntime.wrap(function _callee2$(_context2) {
-          while (1) switch (_context2.prev = _context2.next) {
-            case 0:
-              lock = fileMetaCache.get("lock.json");
-              _context2.next = 3;
-              return queryPatch(lock.id, JSON.stringify({
-                expire: Date.now() + expire * 60 * 1000
-              }));
-
-            case 3:
-              _ref = _context2.sent;
+        const _ref = yield queryPatch(lock.id, JSON.stringify({
+          expire: Date.now() + expire * 60 * 1000
+        })),
               headRevisionId = _ref.headRevisionId;
-              _context2.next = 7;
-              return query({
-                path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions?fields=revisions(id)")
-              });
 
-            case 7:
-              result = _context2.sent;
-              i = 1;
+        const result = yield query({
+          path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions?fields=revisions(id)")
+        });
 
-            case 9:
-              if (!(i < result.revisions.length)) {
-                _context2.next = 26;
-                break;
-              }
+        for (let i = 1; i < result.revisions.length; i++) {
+          const revId = result.revisions[i].id;
 
-              revId = result.revisions[i].id;
-
-              if (!(revId === headRevisionId)) {
-                _context2.next = 14;
-                break;
-              }
-
-              // success
-              lockRev = headRevisionId;
-              return _context2.abrupt("return");
-
-            case 14:
-              _context2.next = 16;
-              return query({
-                path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions/").concat(revId, "?alt=media")
-              });
-
-            case 16:
-              rev = _context2.sent;
-
-              if (!(rev.expire > Date.now())) {
-                _context2.next = 21;
-                break;
-              }
-
-              _context2.next = 20;
-              return revDelete(lock.id, headRevisionId);
-
-            case 20:
-              throw new CustomError("EEXIST", new Error("failed to acquire lock"));
-
-            case 21:
-              _context2.next = 23;
-              return revDelete(lock.id, revId);
-
-            case 23:
-              i++;
-              _context2.next = 9;
-              break;
-
-            case 26:
-              throw new Error("cannot find lock revision");
-
-            case 27:
-            case "end":
-              return _context2.stop();
+          if (revId === headRevisionId) {
+            // success
+            lockRev = headRevisionId;
+            return;
           }
-        }, _callee2);
-      }));
+
+          const rev = yield query({
+            path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions/").concat(revId, "?alt=media")
+          });
+
+          if (rev.expire > Date.now()) {
+            // failed, delete the lock
+            yield revDelete(lock.id, headRevisionId);
+            throw new CustomError("EEXIST", new Error("failed to acquire lock"));
+          } // delete outdated lock
+
+
+          yield revDelete(lock.id, revId);
+        }
+
+        throw new Error("cannot find lock revision");
+      });
       return _acquireLock.apply(this, arguments);
     }
 
@@ -1667,26 +1071,11 @@ var dbToCloud = (function (exports) {
     }
 
     function _releaseLock() {
-      _releaseLock = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee3() {
-        var lock;
-        return regeneratorRuntime.wrap(function _callee3$(_context3) {
-          while (1) switch (_context3.prev = _context3.next) {
-            case 0:
-              lock = fileMetaCache.get("lock.json");
-              _context3.next = 3;
-              return revDelete(lock.id, lockRev);
-
-            case 3:
-              lockRev = null;
-
-            case 4:
-            case "end":
-              return _context3.stop();
-          }
-        }, _callee3);
-      }));
+      _releaseLock = _asyncToGenerator(function* () {
+        const lock = fileMetaCache.get("lock.json");
+        yield revDelete(lock.id, lockRev);
+        lockRev = null;
+      });
       return _releaseLock.apply(this, arguments);
     }
 
@@ -1695,46 +1084,20 @@ var dbToCloud = (function (exports) {
     }
 
     function _queryList() {
-      _queryList = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee4(path, onPage) {
-        var result;
-        return regeneratorRuntime.wrap(function _callee4$(_context4) {
-          while (1) switch (_context4.prev = _context4.next) {
-            case 0:
-              path = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=nextPageToken,files(id,name,headRevisionId)" + (path ? "&" + path : "");
-              _context4.next = 3;
-              return query({
-                path
-              });
+      _queryList = _asyncToGenerator(function* (path, onPage) {
+        path = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=nextPageToken,files(id,name,headRevisionId)" + (path ? "&" + path : "");
+        let result = yield query({
+          path
+        });
+        onPage(result);
 
-            case 3:
-              result = _context4.sent;
-              onPage(result);
-
-            case 5:
-              if (!result.nextPageToken) {
-                _context4.next = 12;
-                break;
-              }
-
-              _context4.next = 8;
-              return query({
-                path: "".concat(path, "&pageToken=").concat(result.nextPageToken)
-              });
-
-            case 8:
-              result = _context4.sent;
-              onPage(result);
-              _context4.next = 5;
-              break;
-
-            case 12:
-            case "end":
-              return _context4.stop();
-          }
-        }, _callee4);
-      }));
+        while (result.nextPageToken) {
+          result = yield query({
+            path: "".concat(path, "&pageToken=").concat(result.nextPageToken)
+          });
+          onPage(result);
+        }
+      });
       return _queryList.apply(this, arguments);
     }
 
@@ -1743,31 +1106,16 @@ var dbToCloud = (function (exports) {
     }
 
     function _queryPatch() {
-      _queryPatch = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee5(id, text) {
-        return regeneratorRuntime.wrap(function _callee5$(_context5) {
-          while (1) switch (_context5.prev = _context5.next) {
-            case 0:
-              _context5.next = 2;
-              return query({
-                method: "PATCH",
-                path: "https://www.googleapis.com/upload/drive/v3/files/".concat(id, "?uploadType=media&fields=headRevisionId"),
-                headers: {
-                  "Content-Type": "text/plain"
-                },
-                body: text
-              });
-
-            case 2:
-              return _context5.abrupt("return", _context5.sent);
-
-            case 3:
-            case "end":
-              return _context5.stop();
-          }
-        }, _callee5);
-      }));
+      _queryPatch = _asyncToGenerator(function* (id, text) {
+        return yield query({
+          method: "PATCH",
+          path: "https://www.googleapis.com/upload/drive/v3/files/".concat(id, "?uploadType=media&fields=headRevisionId"),
+          headers: {
+            "Content-Type": "text/plain"
+          },
+          body: text
+        });
+      });
       return _queryPatch.apply(this, arguments);
     }
 
@@ -1776,49 +1124,37 @@ var dbToCloud = (function (exports) {
     }
 
     function _updateMeta() {
-      _updateMeta = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee6(query) {
-        return regeneratorRuntime.wrap(function _callee6$(_context6) {
-          while (1) switch (_context6.prev = _context6.next) {
-            case 0:
-              if (query) {
-                query = "q=".concat(encodeURIComponent(query));
+      _updateMeta = _asyncToGenerator(function* (query) {
+        if (query) {
+          query = "q=".concat(encodeURIComponent(query));
+        }
+
+        yield queryList(query, result => {
+          var _iteratorNormalCompletion = true;
+          var _didIteratorError = false;
+          var _iteratorError = undefined;
+
+          try {
+            for (var _iterator = result.files[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+              const file = _step.value;
+              fileMetaCache.set(file.name, file);
+            }
+          } catch (err) {
+            _didIteratorError = true;
+            _iteratorError = err;
+          } finally {
+            try {
+              if (!_iteratorNormalCompletion && _iterator.return != null) {
+                _iterator.return();
               }
-
-              _context6.next = 3;
-              return queryList(query, result => {
-                var _iteratorNormalCompletion = true;
-                var _didIteratorError = false;
-                var _iteratorError = undefined;
-
-                try {
-                  for (var _iterator = result.files[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-                    const file = _step.value;
-                    fileMetaCache.set(file.name, file);
-                  }
-                } catch (err) {
-                  _didIteratorError = true;
-                  _iteratorError = err;
-                } finally {
-                  try {
-                    if (!_iteratorNormalCompletion && _iterator.return != null) {
-                      _iterator.return();
-                    }
-                  } finally {
-                    if (_didIteratorError) {
-                      throw _iteratorError;
-                    }
-                  }
-                }
-              });
-
-            case 3:
-            case "end":
-              return _context6.stop();
+            } finally {
+              if (_didIteratorError) {
+                throw _iteratorError;
+              }
+            }
           }
-        }, _callee6);
-      }));
+        });
+      });
       return _updateMeta.apply(this, arguments);
     }
 
@@ -1827,39 +1163,17 @@ var dbToCloud = (function (exports) {
     }
 
     function _init() {
-      _init = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee7() {
-        return regeneratorRuntime.wrap(function _callee7$(_context7) {
-          while (1) switch (_context7.prev = _context7.next) {
-            case 0:
-              _context7.next = 2;
-              return updateMeta();
+      _init = _asyncToGenerator(function* () {
+        yield updateMeta();
 
-            case 2:
-              if (fileMetaCache.has("lock.json")) {
-                _context7.next = 5;
-                break;
-              }
+        if (!fileMetaCache.has("lock.json")) {
+          yield post("lock.json", "{}");
+        }
 
-              _context7.next = 5;
-              return post("lock.json", "{}");
-
-            case 5:
-              if (fileMetaCache.has("meta.json")) {
-                _context7.next = 8;
-                break;
-              }
-
-              _context7.next = 8;
-              return post("meta.json", "{}");
-
-            case 8:
-            case "end":
-              return _context7.stop();
-          }
-        }, _callee7);
-      }));
+        if (!fileMetaCache.has("meta.json")) {
+          yield post("meta.json", "{}");
+        }
+      });
       return _init.apply(this, arguments);
     }
 
@@ -1868,75 +1182,33 @@ var dbToCloud = (function (exports) {
     }
 
     function _query() {
-      _query = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee8(_ref2) {
-        var _ref2$method, method, path, headers, _ref2$format, format, args, res, _ref3, error;
+      _query = _asyncToGenerator(function* (_ref2) {
+        let _ref2$method = _ref2.method,
+            method = _ref2$method === void 0 ? "GET" : _ref2$method,
+            path = _ref2.path,
+            headers = _ref2.headers,
+            _ref2$format = _ref2.format,
+            format = _ref2$format === void 0 ? "json" : _ref2$format,
+            args = _objectWithoutProperties(_ref2, ["method", "path", "headers", "format"]);
 
-        return regeneratorRuntime.wrap(function _callee8$(_context8) {
-          while (1) switch (_context8.prev = _context8.next) {
-            case 0:
-              _ref2$method = _ref2.method, method = _ref2$method === void 0 ? "GET" : _ref2$method, path = _ref2.path, headers = _ref2.headers, _ref2$format = _ref2.format, format = _ref2$format === void 0 ? "json" : _ref2$format, args = _objectWithoutProperties(_ref2, ["method", "path", "headers", "format"]);
-              _context8.t0 = _fetch;
-              _context8.t1 = path;
-              _context8.t2 = _objectSpread2;
-              _context8.t3 = method;
-              _context8.t4 = _objectSpread2;
-              _context8.t5 = "Bearer ";
-              _context8.next = 9;
-              return getAccessToken();
+        const res = yield _fetch(path, _objectSpread2({
+          method,
+          headers: _objectSpread2({
+            "Authorization": "Bearer ".concat((yield getAccessToken()))
+          }, headers)
+        }, args));
 
-            case 9:
-              _context8.t6 = _context8.sent;
-              _context8.t7 = _context8.t5.concat.call(_context8.t5, _context8.t6);
-              _context8.t8 = {
-                "Authorization": _context8.t7
-              };
-              _context8.t9 = headers;
-              _context8.t10 = (0, _context8.t4)(_context8.t8, _context8.t9);
-              _context8.t11 = {
-                method: _context8.t3,
-                headers: _context8.t10
-              };
-              _context8.t12 = args;
-              _context8.t13 = (0, _context8.t2)(_context8.t11, _context8.t12);
-              _context8.next = 19;
-              return (0, _context8.t0)(_context8.t1, _context8.t13);
+        if (!res.ok) {
+          const _ref3 = yield res.json(),
+                error = _ref3.error;
 
-            case 19:
-              res = _context8.sent;
+          throw new CustomError(error.code, error);
+        }
 
-              if (res.ok) {
-                _context8.next = 26;
-                break;
-              }
-
-              _context8.next = 23;
-              return res.json();
-
-            case 23:
-              _ref3 = _context8.sent;
-              error = _ref3.error;
-              throw new CustomError(error.code, error);
-
-            case 26:
-              if (!format) {
-                _context8.next = 30;
-                break;
-              }
-
-              _context8.next = 29;
-              return res[format]();
-
-            case 29:
-              return _context8.abrupt("return", _context8.sent);
-
-            case 30:
-            case "end":
-              return _context8.stop();
-          }
-        }, _callee8);
-      }));
+        if (format) {
+          return yield res[format]();
+        }
+      });
       return _query.apply(this, arguments);
     }
 
@@ -1945,20 +1217,12 @@ var dbToCloud = (function (exports) {
     }
 
     function _list() {
-      _list = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee9(file) {
-        return regeneratorRuntime.wrap(function _callee9$(_context9) {
-          while (1) switch (_context9.prev = _context9.next) {
-            case 0:
-              return _context9.abrupt("return", [...fileMetaCache.values()].filter(f => f.name.startsWith(file + "/")).map(f => f.name.split("/")[1]));
-
-            case 1:
-            case "end":
-              return _context9.stop();
-          }
-        }, _callee9);
-      }));
+      _list = _asyncToGenerator(function* (file) {
+        // FIXME: this only works if file is a single dir
+        // FIXME: this only works if the list method is called right after init, use
+        // queryList instead?
+        return [...fileMetaCache.values()].filter(f => f.name.startsWith(file + "/")).map(f => f.name.split("/")[1]);
+      });
       return _list.apply(this, arguments);
     }
 
@@ -1967,60 +1231,31 @@ var dbToCloud = (function (exports) {
     }
 
     function _get() {
-      _get = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee10(file) {
-        var meta;
-        return regeneratorRuntime.wrap(function _callee10$(_context10) {
-          while (1) switch (_context10.prev = _context10.next) {
-            case 0:
-              meta = fileMetaCache.get(file);
+      _get = _asyncToGenerator(function* (file) {
+        let meta = fileMetaCache.get(file);
 
-              if (meta) {
-                _context10.next = 7;
-                break;
-              }
+        if (!meta) {
+          yield updateMeta("name = '".concat(file, "'"));
+          meta = fileMetaCache.get(file);
 
-              _context10.next = 4;
-              return updateMeta("name = '".concat(file, "'"));
-
-            case 4:
-              meta = fileMetaCache.get(file);
-
-              if (meta) {
-                _context10.next = 7;
-                break;
-              }
-
-              throw new CustomError("ENOENT", new Error("metaCache doesn't contain ".concat(file)));
-
-            case 7:
-              _context10.prev = 7;
-              _context10.next = 10;
-              return query({
-                path: "https://www.googleapis.com/drive/v3/files/".concat(meta.id, "?alt=media"),
-                format: "text"
-              });
-
-            case 10:
-              return _context10.abrupt("return", _context10.sent);
-
-            case 13:
-              _context10.prev = 13;
-              _context10.t0 = _context10["catch"](7);
-
-              if (_context10.t0.code === 404) {
-                _context10.t0.code = "ENOENT";
-              }
-
-              throw _context10.t0;
-
-            case 17:
-            case "end":
-              return _context10.stop();
+          if (!meta) {
+            throw new CustomError("ENOENT", new Error("metaCache doesn't contain ".concat(file)));
           }
-        }, _callee10, null, [[7, 13]]);
-      }));
+        }
+
+        try {
+          return yield query({
+            path: "https://www.googleapis.com/drive/v3/files/".concat(meta.id, "?alt=media"),
+            format: "text"
+          });
+        } catch (err) {
+          if (err.code === 404) {
+            err.code = "ENOENT";
+          }
+
+          throw err;
+        }
+      });
       return _get.apply(this, arguments);
     }
 
@@ -2029,39 +1264,15 @@ var dbToCloud = (function (exports) {
     }
 
     function _put() {
-      _put = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee11(file, data) {
-        var meta, result;
-        return regeneratorRuntime.wrap(function _callee11$(_context11) {
-          while (1) switch (_context11.prev = _context11.next) {
-            case 0:
-              if (fileMetaCache.has(file)) {
-                _context11.next = 4;
-                break;
-              }
+      _put = _asyncToGenerator(function* (file, data) {
+        if (!fileMetaCache.has(file)) {
+          return yield post(file, data);
+        }
 
-              _context11.next = 3;
-              return post(file, data);
-
-            case 3:
-              return _context11.abrupt("return", _context11.sent);
-
-            case 4:
-              meta = fileMetaCache.get(file);
-              _context11.next = 7;
-              return queryPatch(meta.id, data);
-
-            case 7:
-              result = _context11.sent;
-              meta.headRevisionId = result.headRevisionId;
-
-            case 9:
-            case "end":
-              return _context11.stop();
-          }
-        }, _callee11);
-      }));
+        const meta = fileMetaCache.get(file);
+        const result = yield queryPatch(meta.id, data);
+        meta.headRevisionId = result.headRevisionId;
+      });
       return _put.apply(this, arguments);
     }
 
@@ -2070,41 +1281,25 @@ var dbToCloud = (function (exports) {
     }
 
     function _post() {
-      _post = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee12(file, data) {
-        var body, meta, result;
-        return regeneratorRuntime.wrap(function _callee12$(_context12) {
-          while (1) switch (_context12.prev = _context12.next) {
-            case 0:
-              body = new _FormData();
-              meta = {
-                name: file,
-                parents: ["appDataFolder"]
-              };
-              body.append("metadata", new _Blob([JSON.stringify(meta)], {
-                type: "application/json; charset=UTF-8"
-              }));
-              body.append("media", new _Blob([data], {
-                type: "text/plain"
-              }));
-              _context12.next = 6;
-              return query({
-                method: "POST",
-                path: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,headRevisionId",
-                body
-              });
-
-            case 6:
-              result = _context12.sent;
-              fileMetaCache.set(result.name, result);
-
-            case 8:
-            case "end":
-              return _context12.stop();
-          }
-        }, _callee12);
-      }));
+      _post = _asyncToGenerator(function* (file, data) {
+        const body = new _FormData();
+        const meta = {
+          name: file,
+          parents: ["appDataFolder"]
+        };
+        body.append("metadata", new _Blob([JSON.stringify(meta)], {
+          type: "application/json; charset=UTF-8"
+        }));
+        body.append("media", new _Blob([data], {
+          type: "text/plain"
+        }));
+        const result = yield query({
+          method: "POST",
+          path: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,headRevisionId",
+          body
+        });
+        fileMetaCache.set(result.name, result);
+      });
       return _post.apply(this, arguments);
     }
 
@@ -2113,55 +1308,27 @@ var dbToCloud = (function (exports) {
     }
 
     function _delete_() {
-      _delete_ = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee13(file) {
-        var meta;
-        return regeneratorRuntime.wrap(function _callee13$(_context13) {
-          while (1) switch (_context13.prev = _context13.next) {
-            case 0:
-              meta = fileMetaCache.get(file);
+      _delete_ = _asyncToGenerator(function* (file) {
+        const meta = fileMetaCache.get(file);
 
-              if (meta) {
-                _context13.next = 3;
-                break;
-              }
+        if (!meta) {
+          return;
+        }
 
-              return _context13.abrupt("return");
-
-            case 3:
-              _context13.prev = 3;
-              _context13.next = 6;
-              return query({
-                method: "DELETE",
-                path: "https://www.googleapis.com/drive/v3/files/".concat(meta.id),
-                format: null
-              });
-
-            case 6:
-              _context13.next = 13;
-              break;
-
-            case 8:
-              _context13.prev = 8;
-              _context13.t0 = _context13["catch"](3);
-
-              if (!(_context13.t0.code === 404)) {
-                _context13.next = 12;
-                break;
-              }
-
-              return _context13.abrupt("return");
-
-            case 12:
-              throw _context13.t0;
-
-            case 13:
-            case "end":
-              return _context13.stop();
+        try {
+          yield query({
+            method: "DELETE",
+            path: "https://www.googleapis.com/drive/v3/files/".concat(meta.id),
+            format: null
+          });
+        } catch (err) {
+          if (err.code === 404) {
+            return;
           }
-        }, _callee13, null, [[3, 8]]);
-      }));
+
+          throw err;
+        }
+      });
       return _delete_.apply(this, arguments);
     }
   }
@@ -2215,26 +1382,9 @@ var dbToCloud = (function (exports) {
     drive.get =
     /*#__PURE__*/
     function () {
-      var _ref = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee(path) {
-        return regeneratorRuntime.wrap(function _callee$(_context) {
-          while (1) switch (_context.prev = _context.next) {
-            case 0:
-              _context.t0 = JSON;
-              _context.next = 3;
-              return _drive.get(path);
-
-            case 3:
-              _context.t1 = _context.sent;
-              return _context.abrupt("return", _context.t0.parse.call(_context.t0, _context.t1));
-
-            case 5:
-            case "end":
-              return _context.stop();
-          }
-        }, _callee);
-      }));
+      var _ref = _asyncToGenerator(function* (path) {
+        return JSON.parse((yield _drive.get(path)));
+      });
 
       return function (_x) {
         return _ref.apply(this, arguments);
@@ -2244,24 +1394,9 @@ var dbToCloud = (function (exports) {
     drive.put =
     /*#__PURE__*/
     function () {
-      var _ref2 = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee2(path, data) {
-        return regeneratorRuntime.wrap(function _callee2$(_context2) {
-          while (1) switch (_context2.prev = _context2.next) {
-            case 0:
-              _context2.next = 2;
-              return _drive.put(path, JSON.stringify(data));
-
-            case 2:
-              return _context2.abrupt("return", _context2.sent);
-
-            case 3:
-            case "end":
-              return _context2.stop();
-          }
-        }, _callee2);
-      }));
+      var _ref2 = _asyncToGenerator(function* (path, data) {
+        return yield _drive.put(path, JSON.stringify(data));
+      });
 
       return function (_x2, _x3) {
         return _ref2.apply(this, arguments);
@@ -2271,24 +1406,9 @@ var dbToCloud = (function (exports) {
     drive.post =
     /*#__PURE__*/
     function () {
-      var _ref3 = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee3(path, data) {
-        return regeneratorRuntime.wrap(function _callee3$(_context3) {
-          while (1) switch (_context3.prev = _context3.next) {
-            case 0:
-              _context3.next = 2;
-              return _drive.post(path, JSON.stringify(data));
-
-            case 2:
-              return _context3.abrupt("return", _context3.sent);
-
-            case 3:
-            case "end":
-              return _context3.stop();
-          }
-        }, _callee3);
-      }));
+      var _ref3 = _asyncToGenerator(function* (path, data) {
+        return yield _drive.post(path, JSON.stringify(data));
+      });
 
       return function (_x4, _x5) {
         return _ref3.apply(this, arguments);
@@ -2316,55 +1436,23 @@ var dbToCloud = (function (exports) {
     }
 
     function _acquireLock() {
-      _acquireLock = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee4(expire) {
-        var data;
-        return regeneratorRuntime.wrap(function _callee4$(_context4) {
-          while (1) switch (_context4.prev = _context4.next) {
-            case 0:
-              _context4.prev = 0;
-              _context4.next = 3;
-              return this.post("lock.json", {
-                expire: Date.now() + expire * 60 * 1000
-              });
+      _acquireLock = _asyncToGenerator(function* (expire) {
+        try {
+          yield this.post("lock.json", {
+            expire: Date.now() + expire * 60 * 1000
+          });
+        } catch (err) {
+          if (err.code === "EEXIST") {
+            const data = yield this.get("lock.json");
 
-            case 3:
-              _context4.next = 15;
-              break;
-
-            case 5:
-              _context4.prev = 5;
-              _context4.t0 = _context4["catch"](0);
-
-              if (!(_context4.t0.code === "EEXIST")) {
-                _context4.next = 14;
-                break;
-              }
-
-              _context4.next = 10;
-              return this.get("lock.json");
-
-            case 10:
-              data = _context4.sent;
-
-              if (!(Date.now() > data.expire)) {
-                _context4.next = 14;
-                break;
-              }
-
-              _context4.next = 14;
-              return this.delete("lock.json");
-
-            case 14:
-              throw _context4.t0;
-
-            case 15:
-            case "end":
-              return _context4.stop();
+            if (Date.now() > data.expire) {
+              yield this.delete("lock.json");
+            }
           }
-        }, _callee4, this, [[0, 5]]);
-      }));
+
+          throw err;
+        }
+      });
       return _acquireLock.apply(this, arguments);
     }
 
@@ -2373,21 +1461,9 @@ var dbToCloud = (function (exports) {
     }
 
     function _releaseLock() {
-      _releaseLock = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee5() {
-        return regeneratorRuntime.wrap(function _callee5$(_context5) {
-          while (1) switch (_context5.prev = _context5.next) {
-            case 0:
-              _context5.next = 2;
-              return this.delete("lock.json");
-
-            case 2:
-            case "end":
-              return _context5.stop();
-          }
-        }, _callee5, this);
-      }));
+      _releaseLock = _asyncToGenerator(function* () {
+        yield this.delete("lock.json");
+      });
       return _releaseLock.apply(this, arguments);
     }
 
@@ -2396,39 +1472,17 @@ var dbToCloud = (function (exports) {
     }
 
     function _getMeta() {
-      _getMeta = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee6() {
-        return regeneratorRuntime.wrap(function _callee6$(_context6) {
-          while (1) switch (_context6.prev = _context6.next) {
-            case 0:
-              _context6.prev = 0;
-              _context6.next = 3;
-              return this.get("meta.json");
-
-            case 3:
-              return _context6.abrupt("return", _context6.sent);
-
-            case 6:
-              _context6.prev = 6;
-              _context6.t0 = _context6["catch"](0);
-
-              if (!(_context6.t0.code === "ENOENT")) {
-                _context6.next = 10;
-                break;
-              }
-
-              return _context6.abrupt("return", {});
-
-            case 10:
-              throw _context6.t0;
-
-            case 11:
-            case "end":
-              return _context6.stop();
+      _getMeta = _asyncToGenerator(function* () {
+        try {
+          return yield this.get("meta.json");
+        } catch (err) {
+          if (err.code === "ENOENT") {
+            return {};
           }
-        }, _callee6, this, [[0, 6]]);
-      }));
+
+          throw err;
+        }
+      });
       return _getMeta.apply(this, arguments);
     }
 
@@ -2437,21 +1491,9 @@ var dbToCloud = (function (exports) {
     }
 
     function _putMeta() {
-      _putMeta = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee7(data) {
-        return regeneratorRuntime.wrap(function _callee7$(_context7) {
-          while (1) switch (_context7.prev = _context7.next) {
-            case 0:
-              _context7.next = 2;
-              return this.put("meta.json", data);
-
-            case 2:
-            case "end":
-              return _context7.stop();
-          }
-        }, _callee7, this);
-      }));
+      _putMeta = _asyncToGenerator(function* (data) {
+        yield this.put("meta.json", data);
+      });
       return _putMeta.apply(this, arguments);
     }
 
@@ -2460,26 +1502,10 @@ var dbToCloud = (function (exports) {
     }
 
     function _peekChanges() {
-      _peekChanges = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee8(oldMeta) {
-        var newMeta;
-        return regeneratorRuntime.wrap(function _callee8$(_context8) {
-          while (1) switch (_context8.prev = _context8.next) {
-            case 0:
-              _context8.next = 2;
-              return this.getMeta();
-
-            case 2:
-              newMeta = _context8.sent;
-              return _context8.abrupt("return", newMeta.lastChange !== oldMeta.lastChange);
-
-            case 4:
-            case "end":
-              return _context8.stop();
-          }
-        }, _callee8, this);
-      }));
+      _peekChanges = _asyncToGenerator(function* (oldMeta) {
+        const newMeta = yield this.getMeta();
+        return newMeta.lastChange !== oldMeta.lastChange;
+      });
       return _peekChanges.apply(this, arguments);
     }
   }
@@ -2522,68 +1548,28 @@ var dbToCloud = (function (exports) {
     }
 
     function _start() {
-      _start = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee9() {
-        return regeneratorRuntime.wrap(function _callee9$(_context9) {
-          while (1) switch (_context9.prev = _context9.next) {
-            case 0:
-              if (_drive2) {
-                _context9.next = 2;
-                break;
-              }
+      _start = _asyncToGenerator(function* () {
+        if (!_drive2) {
+          throw new Error("cloud drive is undefined");
+        }
 
-              throw new Error("cloud drive is undefined");
+        if (_drive2.init) {
+          yield _drive2.init();
+        }
 
-            case 2:
-              if (!_drive2.init) {
-                _context9.next = 5;
-                break;
-              }
+        state = (yield getState(_drive2)) || {};
+        state.enabled = true;
 
-              _context9.next = 5;
-              return _drive2.init();
+        if (!state.queue) {
+          state.queue = [];
+        }
 
-            case 5:
-              _context9.next = 7;
-              return getState(_drive2);
+        if (state.lastChange == null) {
+          yield onFirstSync();
+        }
 
-            case 7:
-              _context9.t0 = _context9.sent;
-
-              if (_context9.t0) {
-                _context9.next = 10;
-                break;
-              }
-
-              _context9.t0 = {};
-
-            case 10:
-              state = _context9.t0;
-              state.enabled = true;
-
-              if (!state.queue) {
-                state.queue = [];
-              }
-
-              if (!(state.lastChange == null)) {
-                _context9.next = 16;
-                break;
-              }
-
-              _context9.next = 16;
-              return onFirstSync();
-
-            case 16:
-              _context9.next = 18;
-              return syncNow();
-
-            case 18:
-            case "end":
-              return _context9.stop();
-          }
-        }, _callee9);
-      }));
+        yield syncNow();
+      });
       return _start.apply(this, arguments);
     }
 
@@ -2592,47 +1578,18 @@ var dbToCloud = (function (exports) {
     }
 
     function _stop() {
-      _stop = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee11() {
-        return regeneratorRuntime.wrap(function _callee11$(_context11) {
-          while (1) switch (_context11.prev = _context11.next) {
-            case 0:
-              state.enabled = false;
-              _context11.next = 3;
-              return lock.write(
-              /*#__PURE__*/
-              _asyncToGenerator(
-              /*#__PURE__*/
-              regeneratorRuntime.mark(function _callee10() {
-                return regeneratorRuntime.wrap(function _callee10$(_context10) {
-                  while (1) switch (_context10.prev = _context10.next) {
-                    case 0:
-                      if (!_drive2.uninit) {
-                        _context10.next = 3;
-                        break;
-                      }
-
-                      _context10.next = 3;
-                      return _drive2.uninit();
-
-                    case 3:
-                      _context10.next = 5;
-                      return saveState();
-
-                    case 5:
-                    case "end":
-                      return _context10.stop();
-                  }
-                }, _callee10);
-              })));
-
-            case 3:
-            case "end":
-              return _context11.stop();
+      _stop = _asyncToGenerator(function* () {
+        state.enabled = false;
+        yield lock.write(
+        /*#__PURE__*/
+        _asyncToGenerator(function* () {
+          if (_drive2.uninit) {
+            yield _drive2.uninit();
           }
-        }, _callee11);
-      }));
+
+          yield saveState();
+        }));
+      });
       return _stop.apply(this, arguments);
     }
 
@@ -2641,236 +1598,115 @@ var dbToCloud = (function (exports) {
     }
 
     function _syncPull() {
-      _syncPull = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee12() {
-        var changes, end, i, newChanges, idx, _iteratorNormalCompletion, _didIteratorError, _iteratorError, _iterator, _step, change, _iteratorNormalCompletion2, _didIteratorError2, _iteratorError2, _iterator2, _step2, _step2$value, id, doc;
+      _syncPull = _asyncToGenerator(function* () {
+        meta = yield _drive2.getMeta();
 
-        return regeneratorRuntime.wrap(function _callee12$(_context12) {
-          while (1) switch (_context12.prev = _context12.next) {
-            case 0:
-              _context12.next = 2;
-              return _drive2.getMeta();
+        if (!meta.lastChange || meta.lastChange === state.lastChange) {
+          // nothing changes
+          return;
+        }
 
-            case 2:
-              meta = _context12.sent;
+        let changes = [];
 
-              if (!(!meta.lastChange || meta.lastChange === state.lastChange)) {
-                _context12.next = 5;
-                break;
-              }
+        if (!state.lastChange) {
+          // pull everything
+          changes = (yield _drive2.list("docs")).map(name => ({
+            action: 'put',
+            _id: name.slice(0, -5)
+          }));
+        } else {
+          const end = Math.floor((meta.lastChange - 1) / 100); // inclusive end
 
-              return _context12.abrupt("return");
+          let i = Math.floor(state.lastChange / 100);
 
-            case 5:
-              changes = [];
-
-              if (state.lastChange) {
-                _context12.next = 13;
-                break;
-              }
-
-              _context12.next = 9;
-              return _drive2.list("docs");
-
-            case 9:
-              _context12.t0 = name => ({
-                action: 'put',
-                _id: name.slice(0, -5)
-              });
-
-              changes = _context12.sent.map(_context12.t0);
-              _context12.next = 25;
-              break;
-
-            case 13:
-              end = Math.floor((meta.lastChange - 1) / 100); // inclusive end
-
-              i = Math.floor(state.lastChange / 100);
-
-            case 15:
-              if (!(i <= end)) {
-                _context12.next = 24;
-                break;
-              }
-
-              _context12.next = 18;
-              return _drive2.get("changes/".concat(i, ".json"));
-
-            case 18:
-              newChanges = _context12.sent;
-              changeCache.set(i, newChanges);
-              changes = changes.concat(newChanges);
-              i++;
-              _context12.next = 15;
-              break;
-
-            case 24:
-              changes = changes.slice(state.lastChange % 100);
-
-            case 25:
-              // merge changes
-              idx = new Map();
-              _iteratorNormalCompletion = true;
-              _didIteratorError = false;
-              _iteratorError = undefined;
-              _context12.prev = 29;
-
-              for (_iterator = changes[Symbol.iterator](); !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-                change = _step.value;
-                idx.set(change._id, change);
-              }
-
-              _context12.next = 37;
-              break;
-
-            case 33:
-              _context12.prev = 33;
-              _context12.t1 = _context12["catch"](29);
-              _didIteratorError = true;
-              _iteratorError = _context12.t1;
-
-            case 37:
-              _context12.prev = 37;
-              _context12.prev = 38;
-
-              if (!_iteratorNormalCompletion && _iterator.return != null) {
-                _iterator.return();
-              }
-
-            case 40:
-              _context12.prev = 40;
-
-              if (!_didIteratorError) {
-                _context12.next = 43;
-                break;
-              }
-
-              throw _iteratorError;
-
-            case 43:
-              return _context12.finish(40);
-
-            case 44:
-              return _context12.finish(37);
-
-            case 45:
-              _iteratorNormalCompletion2 = true;
-              _didIteratorError2 = false;
-              _iteratorError2 = undefined;
-              _context12.prev = 48;
-              _iterator2 = idx[Symbol.iterator]();
-
-            case 50:
-              if (_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done) {
-                _context12.next = 76;
-                break;
-              }
-
-              _step2$value = _slicedToArray(_step2.value, 2), id = _step2$value[0], change = _step2$value[1];
-
-              if (!(change.action === "delete")) {
-                _context12.next = 57;
-                break;
-              }
-
-              _context12.next = 55;
-              return onDelete(id, change._rev);
-
-            case 55:
-              _context12.next = 72;
-              break;
-
-            case 57:
-              if (!(change.action === "put")) {
-                _context12.next = 72;
-                break;
-              }
-
-              _context12.prev = 58;
-              _context12.next = 61;
-              return _drive2.get("docs/".concat(id, ".json"));
-
-            case 61:
-              doc = _context12.sent;
-              _context12.next = 70;
-              break;
-
-            case 64:
-              _context12.prev = 64;
-              _context12.t2 = _context12["catch"](58);
-
-              if (!(_context12.t2.code === "ENOENT")) {
-                _context12.next = 69;
-                break;
-              }
-
-              onWarn("Cannot find ".concat(id, ". Is it deleted without updating the history?"));
-              return _context12.abrupt("continue", 73);
-
-            case 69:
-              throw _context12.t2;
-
-            case 70:
-              _context12.next = 72;
-              return onPut(doc);
-
-            case 72:
-              // record the remote revision
-              if (change._rev) {
-                revisionCache.set(id, change._rev);
-              }
-
-            case 73:
-              _iteratorNormalCompletion2 = true;
-              _context12.next = 50;
-              break;
-
-            case 76:
-              _context12.next = 82;
-              break;
-
-            case 78:
-              _context12.prev = 78;
-              _context12.t3 = _context12["catch"](48);
-              _didIteratorError2 = true;
-              _iteratorError2 = _context12.t3;
-
-            case 82:
-              _context12.prev = 82;
-              _context12.prev = 83;
-
-              if (!_iteratorNormalCompletion2 && _iterator2.return != null) {
-                _iterator2.return();
-              }
-
-            case 85:
-              _context12.prev = 85;
-
-              if (!_didIteratorError2) {
-                _context12.next = 88;
-                break;
-              }
-
-              throw _iteratorError2;
-
-            case 88:
-              return _context12.finish(85);
-
-            case 89:
-              return _context12.finish(82);
-
-            case 90:
-              state.lastChange = meta.lastChange;
-              _context12.next = 93;
-              return saveState();
-
-            case 93:
-            case "end":
-              return _context12.stop();
+          while (i <= end) {
+            const newChanges = yield _drive2.get("changes/".concat(i, ".json"));
+            changeCache.set(i, newChanges);
+            changes = changes.concat(newChanges);
+            i++;
           }
-        }, _callee12, null, [[29, 33, 37, 45], [38,, 40, 44], [48, 78, 82, 90], [58, 64], [83,, 85, 89]]);
-      }));
+
+          changes = changes.slice(state.lastChange % 100);
+        } // merge changes
+
+
+        const idx = new Map();
+        var _iteratorNormalCompletion = true;
+        var _didIteratorError = false;
+        var _iteratorError = undefined;
+
+        try {
+          for (var _iterator = changes[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            const change = _step.value;
+            idx.set(change._id, change);
+          }
+        } catch (err) {
+          _didIteratorError = true;
+          _iteratorError = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion && _iterator.return != null) {
+              _iterator.return();
+            }
+          } finally {
+            if (_didIteratorError) {
+              throw _iteratorError;
+            }
+          }
+        }
+
+        var _iteratorNormalCompletion2 = true;
+        var _didIteratorError2 = false;
+        var _iteratorError2 = undefined;
+
+        try {
+          for (var _iterator2 = idx[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+            const _step2$value = _slicedToArray(_step2.value, 2),
+                  id = _step2$value[0],
+                  change = _step2$value[1];
+
+            if (change.action === "delete") {
+              yield onDelete(id, change._rev);
+            } else if (change.action === "put") {
+              let doc;
+
+              try {
+                doc = yield _drive2.get("docs/".concat(id, ".json"));
+              } catch (err) {
+                if (err.code === "ENOENT") {
+                  onWarn("Cannot find ".concat(id, ". Is it deleted without updating the history?"));
+                  continue;
+                }
+
+                throw err;
+              }
+
+              yield onPut(doc);
+            } // record the remote revision
+
+
+            if (change._rev) {
+              revisionCache.set(id, change._rev);
+            }
+          }
+        } catch (err) {
+          _didIteratorError2 = true;
+          _iteratorError2 = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion2 && _iterator2.return != null) {
+              _iterator2.return();
+            }
+          } finally {
+            if (_didIteratorError2) {
+              throw _iteratorError2;
+            }
+          }
+        }
+
+        state.lastChange = meta.lastChange;
+        yield saveState();
+      });
       return _syncPull.apply(this, arguments);
     }
 
@@ -2879,253 +1715,112 @@ var dbToCloud = (function (exports) {
     }
 
     function _syncPush() {
-      _syncPush = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee13() {
-        var changes, idx, _iteratorNormalCompletion3, _didIteratorError3, _iteratorError3, _iterator3, _step3, change, newChanges, _iteratorNormalCompletion4, _didIteratorError4, _iteratorError4, _iterator4, _step4, _step4$value, id, remoteRev, lastChanges, index, len, i, window;
+      _syncPush = _asyncToGenerator(function* () {
+        if (!state.queue.length) {
+          // nothing to push
+          return;
+        } // snapshot
 
-        return regeneratorRuntime.wrap(function _callee13$(_context13) {
-          while (1) switch (_context13.prev = _context13.next) {
-            case 0:
-              if (state.queue.length) {
-                _context13.next = 2;
-                break;
-              }
 
-              return _context13.abrupt("return");
+        const changes = state.queue.slice(); // merge changes
 
-            case 2:
-              // snapshot
-              changes = state.queue.slice(); // merge changes
+        const idx = new Map();
+        var _iteratorNormalCompletion3 = true;
+        var _didIteratorError3 = false;
+        var _iteratorError3 = undefined;
 
-              idx = new Map();
-              _iteratorNormalCompletion3 = true;
-              _didIteratorError3 = false;
-              _iteratorError3 = undefined;
-              _context13.prev = 7;
-
-              for (_iterator3 = changes[Symbol.iterator](); !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
-                change = _step3.value;
-                idx.set(change._id, change);
-              }
-
-              _context13.next = 15;
-              break;
-
-            case 11:
-              _context13.prev = 11;
-              _context13.t0 = _context13["catch"](7);
-              _didIteratorError3 = true;
-              _iteratorError3 = _context13.t0;
-
-            case 15:
-              _context13.prev = 15;
-              _context13.prev = 16;
-
-              if (!_iteratorNormalCompletion3 && _iterator3.return != null) {
-                _iterator3.return();
-              }
-
-            case 18:
-              _context13.prev = 18;
-
-              if (!_didIteratorError3) {
-                _context13.next = 21;
-                break;
-              }
-
-              throw _iteratorError3;
-
-            case 21:
-              return _context13.finish(18);
-
-            case 22:
-              return _context13.finish(15);
-
-            case 23:
-              newChanges = [];
-              _iteratorNormalCompletion4 = true;
-              _didIteratorError4 = false;
-              _iteratorError4 = undefined;
-              _context13.prev = 27;
-              _iterator4 = idx.entries()[Symbol.iterator]();
-
-            case 29:
-              if (_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done) {
-                _context13.next = 52;
-                break;
-              }
-
-              _step4$value = _slicedToArray(_step4.value, 2), id = _step4$value[0], change = _step4$value[1];
-              // FIXME: is it safe to assume that the local doc is newer when
-              // remoteRev is undefined?
-              remoteRev = revisionCache.get(change._id);
-
-              if (!(remoteRev !== undefined && compareRevision(change._rev, remoteRev) <= 0)) {
-                _context13.next = 34;
-                break;
-              }
-
-              return _context13.abrupt("continue", 49);
-
-            case 34:
-              if (!(change.action === "delete")) {
-                _context13.next = 39;
-                break;
-              }
-
-              _context13.next = 37;
-              return _drive2.delete("docs/".concat(id, ".json"));
-
-            case 37:
-              _context13.next = 47;
-              break;
-
-            case 39:
-              if (!(change.action === "put")) {
-                _context13.next = 47;
-                break;
-              }
-
-              _context13.t1 = _drive2;
-              _context13.t2 = "docs/".concat(id, ".json");
-              _context13.next = 44;
-              return onGet(id, change._rev);
-
-            case 44:
-              _context13.t3 = _context13.sent;
-              _context13.next = 47;
-              return _context13.t1.put.call(_context13.t1, _context13.t2, _context13.t3);
-
-            case 47:
-              revisionCache.set(id, change._rev);
-              newChanges.push(change);
-
-            case 49:
-              _iteratorNormalCompletion4 = true;
-              _context13.next = 29;
-              break;
-
-            case 52:
-              _context13.next = 58;
-              break;
-
-            case 54:
-              _context13.prev = 54;
-              _context13.t4 = _context13["catch"](27);
-              _didIteratorError4 = true;
-              _iteratorError4 = _context13.t4;
-
-            case 58:
-              _context13.prev = 58;
-              _context13.prev = 59;
-
-              if (!_iteratorNormalCompletion4 && _iterator4.return != null) {
-                _iterator4.return();
-              }
-
-            case 61:
-              _context13.prev = 61;
-
-              if (!_didIteratorError4) {
-                _context13.next = 64;
-                break;
-              }
-
-              throw _iteratorError4;
-
-            case 64:
-              return _context13.finish(61);
-
-            case 65:
-              return _context13.finish(58);
-
-            case 66:
-              if (!meta.lastChange) {
-                _context13.next = 83;
-                break;
-              }
-
-              index = Math.floor(meta.lastChange / 100);
-              len = meta.lastChange % 100;
-
-              if (!len) {
-                _context13.next = 78;
-                break;
-              }
-
-              _context13.t6 = changeCache.get(index);
-
-              if (_context13.t6) {
-                _context13.next = 75;
-                break;
-              }
-
-              _context13.next = 74;
-              return _drive2.get("changes/".concat(index, ".json"));
-
-            case 74:
-              _context13.t6 = _context13.sent;
-
-            case 75:
-              _context13.t5 = _context13.t6;
-              _context13.next = 79;
-              break;
-
-            case 78:
-              _context13.t5 = [];
-
-            case 79:
-              lastChanges = _context13.t5;
-              // it is possible that JSON data contains more records defined by
-              // meta.lastChange
-              lastChanges = lastChanges.slice(0, len).concat(newChanges);
-              _context13.next = 85;
-              break;
-
-            case 83:
-              // first sync
-              index = 0;
-              lastChanges = newChanges;
-
-            case 85:
-              i = 0;
-
-            case 86:
-              if (!(i * 100 < lastChanges.length)) {
-                _context13.next = 94;
-                break;
-              }
-
-              window = lastChanges.slice(i * 100, (i + 1) * 100);
-              _context13.next = 90;
-              return _drive2.put("changes/".concat(index + i, ".json"), window);
-
-            case 90:
-              changeCache.set(index + i, window);
-
-            case 91:
-              i++;
-              _context13.next = 86;
-              break;
-
-            case 94:
-              meta.lastChange = (meta.lastChange || 0) + newChanges.length;
-              _context13.next = 97;
-              return _drive2.putMeta(meta);
-
-            case 97:
-              state.queue = state.queue.slice(changes.length);
-              state.lastChange = meta.lastChange;
-              _context13.next = 101;
-              return saveState();
-
-            case 101:
-            case "end":
-              return _context13.stop();
+        try {
+          for (var _iterator3 = changes[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+            const change = _step3.value;
+            idx.set(change._id, change);
           }
-        }, _callee13, null, [[7, 11, 15, 23], [16,, 18, 22], [27, 54, 58, 66], [59,, 61, 65]]);
-      }));
+        } catch (err) {
+          _didIteratorError3 = true;
+          _iteratorError3 = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion3 && _iterator3.return != null) {
+              _iterator3.return();
+            }
+          } finally {
+            if (_didIteratorError3) {
+              throw _iteratorError3;
+            }
+          }
+        }
+
+        const newChanges = [];
+        var _iteratorNormalCompletion4 = true;
+        var _didIteratorError4 = false;
+        var _iteratorError4 = undefined;
+
+        try {
+          for (var _iterator4 = idx.entries()[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
+            const _step4$value = _slicedToArray(_step4.value, 2),
+                  id = _step4$value[0],
+                  change = _step4$value[1];
+
+            // FIXME: is it safe to assume that the local doc is newer when
+            // remoteRev is undefined?
+            const remoteRev = revisionCache.get(change._id);
+
+            if (remoteRev !== undefined && compareRevision(change._rev, remoteRev) <= 0) {
+              continue;
+            }
+
+            if (change.action === "delete") {
+              yield _drive2.delete("docs/".concat(id, ".json"));
+            } else if (change.action === "put") {
+              yield _drive2.put("docs/".concat(id, ".json"), (yield onGet(id, change._rev)));
+            }
+
+            revisionCache.set(id, change._rev);
+            newChanges.push(change);
+          } // push changes
+
+        } catch (err) {
+          _didIteratorError4 = true;
+          _iteratorError4 = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion4 && _iterator4.return != null) {
+              _iterator4.return();
+            }
+          } finally {
+            if (_didIteratorError4) {
+              throw _iteratorError4;
+            }
+          }
+        }
+
+        let lastChanges;
+        let index; // meta is already pulled in syncPull
+
+        if (meta.lastChange) {
+          index = Math.floor(meta.lastChange / 100);
+          const len = meta.lastChange % 100;
+          lastChanges = len ? changeCache.get(index) || (yield _drive2.get("changes/".concat(index, ".json"))) : []; // it is possible that JSON data contains more records defined by
+          // meta.lastChange
+
+          lastChanges = lastChanges.slice(0, len).concat(newChanges);
+        } else {
+          // first sync
+          index = 0;
+          lastChanges = newChanges;
+        }
+
+        for (let i = 0; i * 100 < lastChanges.length; i++) {
+          const window = lastChanges.slice(i * 100, (i + 1) * 100);
+          yield _drive2.put("changes/".concat(index + i, ".json"), window);
+          changeCache.set(index + i, window);
+        }
+
+        meta.lastChange = (meta.lastChange || 0) + newChanges.length;
+        yield _drive2.putMeta(meta);
+        state.queue = state.queue.slice(changes.length);
+        state.lastChange = meta.lastChange;
+        yield saveState();
+      });
       return _syncPush.apply(this, arguments);
     }
 
@@ -3134,38 +1829,16 @@ var dbToCloud = (function (exports) {
     }
 
     function _sync() {
-      _sync = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee14() {
-        return regeneratorRuntime.wrap(function _callee14$(_context14) {
-          while (1) switch (_context14.prev = _context14.next) {
-            case 0:
-              _context14.next = 2;
-              return _drive2.acquireLock(lockExpire);
+      _sync = _asyncToGenerator(function* () {
+        yield _drive2.acquireLock(lockExpire);
 
-            case 2:
-              _context14.prev = 2;
-              _context14.next = 5;
-              return syncPull();
-
-            case 5:
-              _context14.next = 7;
-              return syncPush();
-
-            case 7:
-              _context14.prev = 7;
-              _context14.next = 10;
-              return _drive2.releaseLock();
-
-            case 10:
-              return _context14.finish(7);
-
-            case 11:
-            case "end":
-              return _context14.stop();
-          }
-        }, _callee14, null, [[2,, 7, 11]]);
-      }));
+        try {
+          yield syncPull();
+          yield syncPush();
+        } finally {
+          yield _drive2.releaseLock();
+        }
+      });
       return _sync.apply(this, arguments);
     }
 
@@ -3174,65 +1847,25 @@ var dbToCloud = (function (exports) {
     }
 
     function _syncNow() {
-      _syncNow = _asyncToGenerator(
-      /*#__PURE__*/
-      regeneratorRuntime.mark(function _callee16(peek = true) {
-        return regeneratorRuntime.wrap(function _callee16$(_context16) {
-          while (1) switch (_context16.prev = _context16.next) {
-            case 0:
-              if (state.enabled) {
-                _context16.next = 2;
-                break;
-              }
+      _syncNow = _asyncToGenerator(function* (peek = true) {
+        if (!state.enabled) {
+          throw new Error("Cannot sync now, the sync is not enabled");
+        }
 
-              throw new Error("Cannot sync now, the sync is not enabled");
+        yield lock.write(
+        /*#__PURE__*/
+        _asyncToGenerator(function* () {
+          if (!state.queue.length && peek && meta) {
+            const changed = yield _drive2.peekChanges(meta);
 
-            case 2:
-              _context16.next = 4;
-              return lock.write(
-              /*#__PURE__*/
-              _asyncToGenerator(
-              /*#__PURE__*/
-              regeneratorRuntime.mark(function _callee15() {
-                var changed;
-                return regeneratorRuntime.wrap(function _callee15$(_context15) {
-                  while (1) switch (_context15.prev = _context15.next) {
-                    case 0:
-                      if (!(!state.queue.length && peek && meta)) {
-                        _context15.next = 6;
-                        break;
-                      }
-
-                      _context15.next = 3;
-                      return _drive2.peekChanges(meta);
-
-                    case 3:
-                      changed = _context15.sent;
-
-                      if (changed) {
-                        _context15.next = 6;
-                        break;
-                      }
-
-                      return _context15.abrupt("return");
-
-                    case 6:
-                      _context15.next = 8;
-                      return sync();
-
-                    case 8:
-                    case "end":
-                      return _context15.stop();
-                  }
-                }, _callee15);
-              })));
-
-            case 4:
-            case "end":
-              return _context16.stop();
+            if (!changed) {
+              return;
+            }
           }
-        }, _callee16);
-      }));
+
+          yield sync();
+        }));
+      });
       return _syncNow.apply(this, arguments);
     }
 
