@@ -965,7 +965,7 @@ var dbToCloud = (function (exports) {
             if (retry) {
               const time = Number(retry);
 
-              if (!Number.isNaN(time)) {
+              if (time) {
                 yield delay(time * 1000);
                 continue;
               }
