@@ -4,7 +4,6 @@ import cjs from "rollup-plugin-cjs-es";
 import alias from "rollup-plugin-alias";
 import babel from "rollup-plugin-babel";
 import {terser} from "rollup-plugin-terser";
-import globals from "rollup-plugin-external-globals";
 
 function config({output, plugins = []}) {
   return {
@@ -26,11 +25,6 @@ function config({output, plugins = []}) {
         browser: true
       }),
       cjs({nested: true}),
-      globals({
-        "dropbox": "dropbox",
-        "@octokit/plugin-throttling": "octokitPluginThrottling",
-        "@octokit/rest": "Octokit"
-      }),
       babel(),
       ...plugins
       // terser(),
