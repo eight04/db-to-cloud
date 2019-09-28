@@ -349,7 +349,7 @@ async drive.get(path: String) => data: String
 
 Read the data from the drive.
 
-If the path doesn't exist, an error should be thrown and the `code` property should be a string `"ENOENT"`.
+If the path doesn't exist, an error should be thrown and the `code` property should be a string `"ENOENT"` or a number `404`.
 
 ### put
 
@@ -389,7 +389,7 @@ List all files in the folder. This is used on the first sync since we have to fe
 
 Currently, only the `docs` folder will be requested.
 
-If the path doesn't exist, it can throw an ENOENT error or return an empty array.
+If the path doesn't exist, it can throw an ENOENT/404 error or return an empty array.
 
 ### acquireLock, releaseLock
 

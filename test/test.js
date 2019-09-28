@@ -313,7 +313,8 @@ async function suite(prepare) {
 describe("functional", () => {
   const instances = [];
   
-  afterEach(async () => {
+  afterEach(async function () {
+    this.timeout(10 * 1000);
     for (const ctrl of instances) {
       await ctrl.stop();
     }
