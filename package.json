@@ -39,7 +39,6 @@
     "rollup-plugin-analyzer": "^3.2.1",
     "rollup-plugin-babel": "^4.3.3",
     "rollup-plugin-cjs-es": "^0.9.0",
-    "rollup-plugin-external-globals": "^0.4.0",
     "rollup-plugin-node-resolve": "^5.2.0",
     "rollup-plugin-terser": "^5.1.2",
     "sinon": "^7.5.0",
@@ -54,7 +53,7 @@
     "node": ">=8"
   },
   "files": [
-    "drive",
+    "lib",
     "dist"
   ],
   "unpkg": "dist/db-to-cloud.min.js"

@@ -306,1043 +306,6 @@ var dbToCloud = (function (exports) {
     }
   }
 
-  var empty = (() => {});
-
-  const _module_exports_ = {};
-  Object.defineProperty(_module_exports_, "__esModule", {
-    value: true
-  });
-
-  function percentToByte(p) {
-    return String.fromCharCode(parseInt(p.slice(1), 16));
-  }
-
-  function encode(str) {
-    return btoa(encodeURIComponent(str).replace(/%[0-9A-F]{2}/g, percentToByte));
-  }
-
-  _module_exports_.encode = encode;
-
-  function byteToPercent(b) {
-    return "%".concat("00".concat(b.charCodeAt(0).toString(16)).slice(-2));
-  }
-
-  function decode(str) {
-    return decodeURIComponent(Array.from(atob(str), byteToPercent).join(""));
-  }
-
-  _module_exports_.decode = decode;
-
-  class CustomError extends Error {
-    constructor(code, origin, message = origin.message || "An error occured in db-to-cloud") {
-      super(message);
-
-      if (origin.name) {
-        this.name = origin.name;
-      }
-
-      this.code = code;
-      this.origin = origin;
-
-      if (Error.captureStackTrace) {
-        Error.captureStackTrace(this, CustomError);
-      }
-    }
-
-  }
-
-  function createDrive({
-    owner,
-    repo,
-    getAccessToken,
-    getOctokit =
-    /*#__PURE__*/
-    _asyncToGenerator(function* () {
-      const octokit = yield Promise.resolve(Octokit);
-      const Octokit = octokit.Octokit || octokit.default && octokit.default.Octokit || octokit;
-      const throttlingPlugin = yield Promise.resolve(octokitPluginThrottling);
-      return Octokit.plugin(throttlingPlugin.default || throttlingPlugin);
-    })
-  }) {
-    let octokit;
-    const shaCache = new Map();
-    const api = {
-      name: "github",
-      init,
-      get,
-      put,
-      post,
-      delete: delete_,
-      list,
-      shaCache
-    };
-
-    for (var _i = 0, _Object$entries = Object.entries(api); _i < _Object$entries.length; _i++) {
-      const _Object$entries$_i = _slicedToArray(_Object$entries[_i], 2),
-            key = _Object$entries$_i[0],
-            fn = _Object$entries$_i[1];
-
-      if (typeof fn !== "function") {
-        continue;
-      }
-
-      api[key] =
-      /*#__PURE__*/
-      function () {
-        var _ref2 = _asyncToGenerator(function* (...args) {
-          try {
-            return yield fn(...args);
-          } catch (err) {
-            if (err.status === 404) {
-              throw new CustomError("ENOENT", err);
-            }
-
-            throw err;
-          }
-        });
-
-        return function () {
-          return _ref2.apply(this, arguments);
-        };
-      }();
-    }
-
-    return api;
-
-    function init() {
-      return _init.apply(this, arguments);
-    }
-
-    function _init() {
-      _init = _asyncToGenerator(function* () {
-        const Octokit = yield getOctokit();
-        octokit = new Octokit({
-          auth() {
-            return _asyncToGenerator(function* () {
-              return "token ".concat((yield getAccessToken()));
-            })();
-          },
-
-          throttle: {
-            onAbuseLimit: (retryAfter, options) => {
-              console.warn("Abuse detected for request ".concat(options.method, " ").concat(options.url));
-              return false;
-            },
-            onRateLimit: (retryAfter, options) => {
-              console.warn("Request quota exhausted for request ".concat(options.method, " ").concat(options.url));
-              return false;
-            }
-          }
-        });
-      });
-      return _init.apply(this, arguments);
-    }
-
-    function list(_x) {
-      return _list.apply(this, arguments);
-    }
-
-    function _list() {
-      _list = _asyncToGenerator(function* (file) {
-        // FIXME: it seems that it will fail when containing more than 1000 items
-        const result = yield octokit.repos.getContents({
-          owner,
-          repo,
-          path: file
-        });
-        const names = [];
-        var _iteratorNormalCompletion = true;
-        var _didIteratorError = false;
-        var _iteratorError = undefined;
-
-        try {
-          for (var _iterator = result.data[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            const item = _step.value;
-            names.push(item.name);
-            shaCache.set(item.path, item.sha);
-          }
-        } catch (err) {
-          _didIteratorError = true;
-          _iteratorError = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion && _iterator.return != null) {
-              _iterator.return();
-            }
-          } finally {
-            if (_didIteratorError) {
-              throw _iteratorError;
-            }
-          }
-        }
-
-        return names;
-      });
-      return _list.apply(this, arguments);
-    }
-
-    function get(_x2) {
-      return _get.apply(this, arguments);
-    }
-
-    function _get() {
-      _get = _asyncToGenerator(function* (file) {
-        const result = yield octokit.repos.getContents({
-          owner,
-          repo,
-          path: file
-        });
-        shaCache.set(result.data.path, result.data.sha);
-        return _module_exports_.decode(result.data.content);
-      });
-      return _get.apply(this, arguments);
-    }
-
-    function put(_x3, _x4) {
-      return _put.apply(this, arguments);
-    }
-
-    function _put() {
-      _put = _asyncToGenerator(function* (file, data) {
-        const options = {
-          owner,
-          repo,
-          path: file,
-          message: "",
-          content: _module_exports_.encode(data)
-        };
-
-        if (shaCache.has(file)) {
-          options.sha = shaCache.get(file);
-        }
-
-        let result;
-
-        try {
-          result = yield octokit.repos.createOrUpdateFile(options);
-        } catch (err) {
-          if (err.status === 422 && !options.sha) {
-            yield get(file);
-            return yield put(file, data);
-          }
-
-          throw err;
-        }
-
-        shaCache.set(file, result.data.content.sha);
-      });
-      return _put.apply(this, arguments);
-    }
-
-    function post(_x5, _x6) {
-      return _post.apply(this, arguments);
-    }
-
-    function _post() {
-      _post = _asyncToGenerator(function* (file, data) {
-        let result;
-
-        try {
-          result = yield octokit.repos.createOrUpdateFile({
-            owner,
-            repo,
-            path: file,
-            message: "",
-            content: _module_exports_.encode(data)
-          });
-        } catch (err) {
-          if (err.status === 422) {
-            throw new CustomError("EEXIST", err);
-          }
-
-          throw err;
-        }
-
-        shaCache.set(file, result.data.content.sha);
-      });
-      return _post.apply(this, arguments);
-    }
-
-    function delete_(_x7) {
-      return _delete_.apply(this, arguments);
-    }
-
-    function _delete_() {
-      _delete_ = _asyncToGenerator(function* (file) {
-        const sha = shaCache.has(file);
-
-        if (!sha) {
-          yield get(file);
-        }
-
-        try {
-          yield octokit.repos.deleteFile({
-            owner,
-            repo,
-            path: file,
-            message: "",
-            sha: shaCache.get(file)
-          });
-        } catch (err) {
-          if (err.status === 404) {
-            return;
-          } // FIXME: do we have to handle 422 errors?
-
-
-          throw err;
-        }
-      });
-      return _delete_.apply(this, arguments);
-    }
-  }
-
-  function blobToText(blob) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        resolve(reader.result);
-      };
-
-      reader.onerror = () => {
-        reject(new Error("Failed to convert blob object to text"));
-      };
-
-      reader.readAsText(blob);
-    });
-  }
-
-  function testErrorSummary(err, text) {
-    const error = err.error;
-
-    if (typeof error === "string") {
-      return error.includes(text);
-    }
-
-    return error.error_summary && error.error_summary.includes(text);
-  }
-
-  function createDrive$1({
-    getAccessToken,
-    clientId,
-    fetch: _fetch = fetch,
-    getDropbox =
-    /*#__PURE__*/
-    _asyncToGenerator(function* () {
-      return Promise.resolve(dropbox).then(m => m.Dropbox || m.default.Dropbox);
-    })
-  }) {
-    let dropbox;
-    return {
-      name: "dropbox",
-      init,
-      get,
-      put,
-      post,
-      delete: delete_,
-      list
-    };
-
-    function init() {
-      return _init.apply(this, arguments);
-    }
-
-    function _init() {
-      _init = _asyncToGenerator(function* () {
-        const Dropbox = yield getDropbox();
-        dropbox = new Dropbox({
-          fetch: _fetch,
-          clientId
-        });
-        dropbox.setAccessToken((yield getAccessToken(dropbox)));
-      });
-      return _init.apply(this, arguments);
-    }
-
-    function list(_x) {
-      return _list.apply(this, arguments);
-    }
-
-    function _list() {
-      _list = _asyncToGenerator(function* (file) {
-        const names = [];
-        let result = yield dropbox.filesListFolder({
-          path: "/".concat(file)
-        });
-        var _iteratorNormalCompletion = true;
-        var _didIteratorError = false;
-        var _iteratorError = undefined;
-
-        try {
-          for (var _iterator = result.entries[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            const entry = _step.value;
-            names.push(entry.name);
-          }
-        } catch (err) {
-          _didIteratorError = true;
-          _iteratorError = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion && _iterator.return != null) {
-              _iterator.return();
-            }
-          } finally {
-            if (_didIteratorError) {
-              throw _iteratorError;
-            }
-          }
-        }
-
-        if (!result.has_more) {
-          return names;
-        }
-
-        let cursor = result.cursor;
-
-        while (result.has_more) {
-          result = yield dropbox.filesListFolderContinue({
-            cursor
-          });
-          cursor = result.cursor;
-          var _iteratorNormalCompletion2 = true;
-          var _didIteratorError2 = false;
-          var _iteratorError2 = undefined;
-
-          try {
-            for (var _iterator2 = result.entries[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
-              const entry = _step2.value;
-              names.push(entry.name);
-            }
-          } catch (err) {
-            _didIteratorError2 = true;
-            _iteratorError2 = err;
-          } finally {
-            try {
-              if (!_iteratorNormalCompletion2 && _iterator2.return != null) {
-                _iterator2.return();
-              }
-            } finally {
-              if (_didIteratorError2) {
-                throw _iteratorError2;
-              }
-            }
-          }
-        }
-
-        return names;
-      });
-      return _list.apply(this, arguments);
-    }
-
-    function get(_x2) {
-      return _get.apply(this, arguments);
-    }
-
-    function _get() {
-      _get = _asyncToGenerator(function* (file) {
-        let result;
-
-        try {
-          result = yield dropbox.filesDownload({
-            path: "/".concat(file)
-          });
-        } catch (err) {
-          if (testErrorSummary(err, "not_found")) {
-            throw new CustomError("ENOENT", err);
-          }
-
-          throw err;
-        }
-
-        if (result.fileBinary) {
-          return result.fileBinary.toString();
-        }
-
-        return yield blobToText(result.fileBlob);
-      });
-      return _get.apply(this, arguments);
-    }
-
-    function put(_x3, _x4) {
-      return _put.apply(this, arguments);
-    }
-
-    function _put() {
-      _put = _asyncToGenerator(function* (file, data) {
-        yield dropbox.filesUpload({
-          contents: data,
-          path: "/".concat(file),
-          mode: "overwrite",
-          autorename: false
-        });
-      });
-      return _put.apply(this, arguments);
-    }
-
-    function post(_x5, _x6) {
-      return _post.apply(this, arguments);
-    }
-
-    function _post() {
-      _post = _asyncToGenerator(function* (file, data) {
-        try {
-          yield dropbox.filesUpload({
-            contents: data,
-            path: "/".concat(file),
-            mode: "add",
-            autorename: false
-          });
-        } catch (err) {
-          if (testErrorSummary(err, "conflict")) {
-            throw new CustomError("EEXIST", err);
-          }
-
-          throw err;
-        }
-      });
-      return _post.apply(this, arguments);
-    }
-
-    function delete_(_x7) {
-      return _delete_.apply(this, arguments);
-    }
-
-    function _delete_() {
-      _delete_ = _asyncToGenerator(function* (file) {
-        try {
-          yield dropbox.filesDelete({
-            path: "/".concat(file)
-          });
-        } catch (err) {
-          if (testErrorSummary(err, "not_found")) {
-            return;
-          }
-
-          throw err;
-        }
-      });
-      return _delete_.apply(this, arguments);
-    }
-  }
-
-  function createDrive$2({
-    getAccessToken,
-    fetch: _fetch = fetch
-  }) {
-    return {
-      name: "onedrive",
-      get,
-      put,
-      post,
-      delete: delete_,
-      list
-    };
-
-    function query(_x) {
-      return _query.apply(this, arguments);
-    }
-
-    function _query() {
-      _query = _asyncToGenerator(function* (_ref) {
-        let _ref$method = _ref.method,
-            method = _ref$method === void 0 ? "GET" : _ref$method,
-            path = _ref.path,
-            headers = _ref.headers,
-            _ref$format = _ref.format,
-            format = _ref$format === void 0 ? "json" : _ref$format,
-            args = _objectWithoutProperties(_ref, ["method", "path", "headers", "format"]);
-
-        const res = yield _fetch("https://graph.microsoft.com/v1.0/me/drive/special/approot".concat(path), _objectSpread2({
-          method,
-          headers: _objectSpread2({
-            "Authorization": "bearer ".concat((yield getAccessToken()))
-          }, headers)
-        }, args));
-
-        if (!res.ok) {
-          const _ref2 = yield res.json(),
-                error = _ref2.error;
-
-          throw new CustomError(error.code, error);
-        }
-
-        if (format) {
-          return yield res[format]();
-        }
-      });
-      return _query.apply(this, arguments);
-    }
-
-    function list(_x2) {
-      return _list.apply(this, arguments);
-    }
-
-    function _list() {
-      _list = _asyncToGenerator(function* (file) {
-        if (file) {
-          file = ":/".concat(file, ":");
-        }
-
-        const result = yield query({
-          path: "".concat(file, "/children?select=name")
-        });
-        return result.value.map(i => i.name);
-      });
-      return _list.apply(this, arguments);
-    }
-
-    function get(_x3) {
-      return _get.apply(this, arguments);
-    }
-
-    function _get() {
-      _get = _asyncToGenerator(function* (file) {
-        try {
-          return yield query({
-            path: ":/".concat(file, ":/content"),
-            format: "text"
-          });
-        } catch (err) {
-          if (err.code === "itemNotFound") {
-            err.code = "ENOENT";
-          }
-
-          throw err;
-        }
-      });
-      return _get.apply(this, arguments);
-    }
-
-    function put(_x4, _x5) {
-      return _put.apply(this, arguments);
-    }
-
-    function _put() {
-      _put = _asyncToGenerator(function* (file, data) {
-        yield query({
-          method: "PUT",
-          path: ":/".concat(file, ":/content"),
-          headers: {
-            "Content-Type": "text/plain"
-          },
-          body: data
-        });
-      });
-      return _put.apply(this, arguments);
-    }
-
-    function post(_x6, _x7) {
-      return _post.apply(this, arguments);
-    }
-
-    function _post() {
-      _post = _asyncToGenerator(function* (file, data) {
-        try {
-          yield query({
-            method: "PUT",
-            path: ":/".concat(file, ":/content?@microsoft.graph.conflictBehavior=fail"),
-            headers: {
-              "Content-Type": "text/plain"
-            },
-            body: data
-          });
-        } catch (err) {
-          if (err.code === "nameAlreadyExists") {
-            err.code = "EEXIST";
-          }
-
-          throw err;
-        }
-      });
-      return _post.apply(this, arguments);
-    }
-
-    function delete_(_x8) {
-      return _delete_.apply(this, arguments);
-    }
-
-    function _delete_() {
-      _delete_ = _asyncToGenerator(function* (file) {
-        try {
-          yield query({
-            method: "DELETE",
-            path: ":/".concat(file, ":"),
-            format: null
-          });
-        } catch (err) {
-          if (err.code === "itemNotFound") {
-            return;
-          }
-
-          throw err;
-        }
-      });
-      return _delete_.apply(this, arguments);
-    }
-  }
-
-  function createDrive$3({
-    getAccessToken,
-
-    /* eslint-disable no-undef */
-    fetch: _fetch = fetch,
-    FormData: _FormData = FormData,
-    Blob: _Blob = Blob
-    /* eslint-enable */
-
-  }) {
-    const fileMetaCache = new Map();
-    let lockRev;
-    return {
-      name: "google",
-      get,
-      put,
-      post,
-      delete: delete_,
-      list,
-      init,
-      acquireLock,
-      releaseLock,
-      fileMetaCache
-    };
-
-    function revDelete(_x, _x2) {
-      return _revDelete.apply(this, arguments);
-    }
-
-    function _revDelete() {
-      _revDelete = _asyncToGenerator(function* (fileId, revId) {
-        yield query({
-          method: "DELETE",
-          path: "https://www.googleapis.com/drive/v3/files/".concat(fileId, "/revisions/").concat(revId),
-          format: null
-        });
-      });
-      return _revDelete.apply(this, arguments);
-    }
-
-    function acquireLock(_x3) {
-      return _acquireLock.apply(this, arguments);
-    }
-
-    function _acquireLock() {
-      _acquireLock = _asyncToGenerator(function* (expire) {
-        const lock = fileMetaCache.get("lock.json");
-
-        const _ref = yield queryPatch(lock.id, JSON.stringify({
-          expire: Date.now() + expire * 60 * 1000
-        })),
-              headRevisionId = _ref.headRevisionId;
-
-        const result = yield query({
-          path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions?fields=revisions(id)")
-        });
-
-        for (let i = 1; i < result.revisions.length; i++) {
-          const revId = result.revisions[i].id;
-
-          if (revId === headRevisionId) {
-            // success
-            lockRev = headRevisionId;
-            return;
-          }
-
-          const rev = yield query({
-            path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions/").concat(revId, "?alt=media")
-          });
-
-          if (rev.expire > Date.now()) {
-            // failed, delete the lock
-            yield revDelete(lock.id, headRevisionId);
-            throw new CustomError("EEXIST", new Error("failed to acquire lock"));
-          } // delete outdated lock
-
-
-          yield revDelete(lock.id, revId);
-        }
-
-        throw new Error("cannot find lock revision");
-      });
-      return _acquireLock.apply(this, arguments);
-    }
-
-    function releaseLock() {
-      return _releaseLock.apply(this, arguments);
-    }
-
-    function _releaseLock() {
-      _releaseLock = _asyncToGenerator(function* () {
-        const lock = fileMetaCache.get("lock.json");
-        yield revDelete(lock.id, lockRev);
-        lockRev = null;
-      });
-      return _releaseLock.apply(this, arguments);
-    }
-
-    function queryList(_x4, _x5) {
-      return _queryList.apply(this, arguments);
-    }
-
-    function _queryList() {
-      _queryList = _asyncToGenerator(function* (path, onPage) {
-        path = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=nextPageToken,files(id,name,headRevisionId)" + (path ? "&" + path : "");
-        let result = yield query({
-          path
-        });
-        onPage(result);
-
-        while (result.nextPageToken) {
-          result = yield query({
-            path: "".concat(path, "&pageToken=").concat(result.nextPageToken)
-          });
-          onPage(result);
-        }
-      });
-      return _queryList.apply(this, arguments);
-    }
-
-    function queryPatch(_x6, _x7) {
-      return _queryPatch.apply(this, arguments);
-    }
-
-    function _queryPatch() {
-      _queryPatch = _asyncToGenerator(function* (id, text) {
-        return yield query({
-          method: "PATCH",
-          path: "https://www.googleapis.com/upload/drive/v3/files/".concat(id, "?uploadType=media&fields=headRevisionId"),
-          headers: {
-            "Content-Type": "text/plain"
-          },
-          body: text
-        });
-      });
-      return _queryPatch.apply(this, arguments);
-    }
-
-    function updateMeta(_x8) {
-      return _updateMeta.apply(this, arguments);
-    }
-
-    function _updateMeta() {
-      _updateMeta = _asyncToGenerator(function* (query) {
-        if (query) {
-          query = "q=".concat(encodeURIComponent(query));
-        }
-
-        yield queryList(query, result => {
-          var _iteratorNormalCompletion = true;
-          var _didIteratorError = false;
-          var _iteratorError = undefined;
-
-          try {
-            for (var _iterator = result.files[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-              const file = _step.value;
-              fileMetaCache.set(file.name, file);
-            }
-          } catch (err) {
-            _didIteratorError = true;
-            _iteratorError = err;
-          } finally {
-            try {
-              if (!_iteratorNormalCompletion && _iterator.return != null) {
-                _iterator.return();
-              }
-            } finally {
-              if (_didIteratorError) {
-                throw _iteratorError;
-              }
-            }
-          }
-        });
-      });
-      return _updateMeta.apply(this, arguments);
-    }
-
-    function init() {
-      return _init.apply(this, arguments);
-    }
-
-    function _init() {
-      _init = _asyncToGenerator(function* () {
-        yield updateMeta();
-
-        if (!fileMetaCache.has("lock.json")) {
-          yield post("lock.json", "{}");
-        }
-
-        if (!fileMetaCache.has("meta.json")) {
-          yield post("meta.json", "{}");
-        }
-      });
-      return _init.apply(this, arguments);
-    }
-
-    function query(_x9) {
-      return _query.apply(this, arguments);
-    }
-
-    function _query() {
-      _query = _asyncToGenerator(function* (_ref2) {
-        let _ref2$method = _ref2.method,
-            method = _ref2$method === void 0 ? "GET" : _ref2$method,
-            path = _ref2.path,
-            headers = _ref2.headers,
-            _ref2$format = _ref2.format,
-            format = _ref2$format === void 0 ? "json" : _ref2$format,
-            args = _objectWithoutProperties(_ref2, ["method", "path", "headers", "format"]);
-
-        const res = yield _fetch(path, _objectSpread2({
-          method,
-          headers: _objectSpread2({
-            "Authorization": "Bearer ".concat((yield getAccessToken()))
-          }, headers)
-        }, args));
-
-        if (!res.ok) {
-          const _ref3 = yield res.json(),
-                error = _ref3.error;
-
-          throw new CustomError(error.code, error);
-        }
-
-        if (format) {
-          return yield res[format]();
-        }
-      });
-      return _query.apply(this, arguments);
-    }
-
-    function list(_x10) {
-      return _list.apply(this, arguments);
-    }
-
-    function _list() {
-      _list = _asyncToGenerator(function* (file) {
-        // FIXME: this only works if file is a single dir
-        // FIXME: this only works if the list method is called right after init, use
-        // queryList instead?
-        return [...fileMetaCache.values()].filter(f => f.name.startsWith(file + "/")).map(f => f.name.split("/")[1]);
-      });
-      return _list.apply(this, arguments);
-    }
-
-    function get(_x11) {
-      return _get.apply(this, arguments);
-    }
-
-    function _get() {
-      _get = _asyncToGenerator(function* (file) {
-        let meta = fileMetaCache.get(file);
-
-        if (!meta) {
-          yield updateMeta("name = '".concat(file, "'"));
-          meta = fileMetaCache.get(file);
-
-          if (!meta) {
-            throw new CustomError("ENOENT", new Error("metaCache doesn't contain ".concat(file)));
-          }
-        }
-
-        try {
-          return yield query({
-            path: "https://www.googleapis.com/drive/v3/files/".concat(meta.id, "?alt=media"),
-            format: "text"
-          });
-        } catch (err) {
-          if (err.code === 404) {
-            err.code = "ENOENT";
-          }
-
-          throw err;
-        }
-      });
-      return _get.apply(this, arguments);
-    }
-
-    function put(_x12, _x13) {
-      return _put.apply(this, arguments);
-    }
-
-    function _put() {
-      _put = _asyncToGenerator(function* (file, data) {
-        if (!fileMetaCache.has(file)) {
-          return yield post(file, data);
-        }
-
-        const meta = fileMetaCache.get(file);
-        const result = yield queryPatch(meta.id, data);
-        meta.headRevisionId = result.headRevisionId;
-      });
-      return _put.apply(this, arguments);
-    }
-
-    function post(_x14, _x15) {
-      return _post.apply(this, arguments);
-    }
-
-    function _post() {
-      _post = _asyncToGenerator(function* (file, data) {
-        const body = new _FormData();
-        const meta = {
-          name: file,
-          parents: ["appDataFolder"]
-        };
-        body.append("metadata", new _Blob([JSON.stringify(meta)], {
-          type: "application/json; charset=UTF-8"
-        }));
-        body.append("media", new _Blob([data], {
-          type: "text/plain"
-        }));
-        const result = yield query({
-          method: "POST",
-          path: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,headRevisionId",
-          body
-        });
-        fileMetaCache.set(result.name, result);
-      });
-      return _post.apply(this, arguments);
-    }
-
-    function delete_(_x16) {
-      return _delete_.apply(this, arguments);
-    }
-
-    function _delete_() {
-      _delete_ = _asyncToGenerator(function* (file) {
-        const meta = fileMetaCache.get(file);
-
-        if (!meta) {
-          return;
-        }
-
-        try {
-          yield query({
-            method: "DELETE",
-            path: "https://www.googleapis.com/drive/v3/files/".concat(meta.id),
-            format: null
-          });
-        } catch (err) {
-          if (err.code === 404) {
-            return;
-          }
-
-          throw err;
-        }
-      });
-      return _delete_.apply(this, arguments);
-    }
-  }
-
-
-
-  var index = /*#__PURE__*/Object.freeze({
-    fsDrive: empty,
-    github: createDrive,
-    dropbox: createDrive$1,
-    onedrive: createDrive$2,
-    google: createDrive$3
-  });
-
   function debounced(fn) {
     let timer = 0;
     let q;
@@ -1476,7 +439,7 @@ var dbToCloud = (function (exports) {
         try {
           return yield this.get("meta.json");
         } catch (err) {
-          if (err.code === "ENOENT") {
+          if (err.code === "ENOENT" || err.code === 404) {
             return {};
           }
 
@@ -1673,7 +636,7 @@ var dbToCloud = (function (exports) {
               try {
                 doc = yield _drive2.get("docs/".concat(id, ".json"));
               } catch (err) {
-                if (err.code === "ENOENT") {
+                if (err.code === "ENOENT" || err.code === 404) {
                   onWarn("Cannot find ".concat(id, ". Is it deleted without updating the history?"));
                   continue;
                 }
@@ -1895,6 +858,980 @@ var dbToCloud = (function (exports) {
       saveState();
     }
   }
+
+  var empty = (() => {});
+
+  const _module_exports_ = {};
+  Object.defineProperty(_module_exports_, "__esModule", {
+    value: true
+  });
+
+  function percentToByte(p) {
+    return String.fromCharCode(parseInt(p.slice(1), 16));
+  }
+
+  function encode(str) {
+    return btoa(encodeURIComponent(str).replace(/%[0-9A-F]{2}/g, percentToByte));
+  }
+
+  _module_exports_.encode = encode;
+
+  function byteToPercent(b) {
+    return "%".concat("00".concat(b.charCodeAt(0).toString(16)).slice(-2));
+  }
+
+  function decode(str) {
+    return decodeURIComponent(Array.from(atob(str), byteToPercent).join(""));
+  }
+
+  _module_exports_.decode = decode;
+
+  class RequestError extends Error {
+    constructor(message, origin, code = origin && origin.status) {
+      super(message);
+      this.code = code;
+      this.origin = origin;
+
+      if (Error.captureStackTrace) {
+        Error.captureStackTrace(this, RequestError);
+      }
+    }
+
+  }
+
+  function delay(time) {
+    return new Promise(resolve => setTimeout(resolve, time));
+  }
+
+  function createRequest({
+    fetch,
+    cooldown = 0,
+    getAccessToken
+  }) {
+    const lock = createLock();
+    return args => {
+      return lock.write(
+      /*#__PURE__*/
+      function () {
+        var _ref = _asyncToGenerator(function* (done) {
+          try {
+            return yield doRequest(args);
+          } finally {
+            if (!cooldown || !args.method || args.method === "GET") {
+              done();
+            } else {
+              setTimeout(done, cooldown);
+            }
+          }
+        });
+
+        return function (_x) {
+          return _ref.apply(this, arguments);
+        };
+      }());
+    };
+
+    function doRequest(_x2) {
+      return _doRequest.apply(this, arguments);
+    }
+
+    function _doRequest() {
+      _doRequest = _asyncToGenerator(function* (_ref2) {
+        let path = _ref2.path,
+            contentType = _ref2.contentType,
+            _headers = _ref2.headers,
+            format = _ref2.format,
+            args = _objectWithoutProperties(_ref2, ["path", "contentType", "headers", "format"]);
+
+        const headers = {
+          "Authorization": "Bearer ".concat((yield getAccessToken()))
+        };
+
+        if (contentType) {
+          headers["Content-Type"] = contentType;
+        }
+
+        Object.assign(headers, _headers);
+
+        while (true) {
+          // eslint-disable-line no-constant-condition
+          const res = yield fetch(path, _objectSpread2({
+            headers
+          }, args));
+
+          if (!res.ok) {
+            const retry = res.headers.get("Retry-After");
+
+            if (retry) {
+              const time = Number(retry);
+
+              if (!Number.isNaN(time)) {
+                yield delay(time * 1000);
+                continue;
+              }
+            }
+
+            const text = yield res.text();
+            throw new RequestError("failed to fetch [".concat(res.status, "]: ").concat(text), res);
+          }
+
+          if (format) {
+            return yield res[format]();
+          }
+
+          const resContentType = res.headers.get("Content-Type");
+
+          if (/application\/json/.test(resContentType)) {
+            return yield res.json();
+          }
+
+          return yield res.text();
+        }
+      });
+      return _doRequest.apply(this, arguments);
+    }
+  }
+
+  function createDrive({
+    userAgent = "db-to-cloud",
+    owner,
+    repo,
+    getAccessToken,
+    fetch = (typeof self !== "undefined" ? self : global).fetch
+  }) {
+    const request = createRequest({
+      fetch,
+      getAccessToken,
+      cooldown: 1000
+    });
+    const shaCache = new Map();
+    return {
+      name: "github",
+      get,
+      put,
+      post,
+      delete: delete_,
+      list,
+      shaCache
+    };
+
+    function requestAPI(args) {
+      if (!args.headers) {
+        args.headers = {};
+      }
+
+      if (!args.headers["User-Agent"]) {
+        args.headers["User-Agent"] = userAgent;
+      }
+
+      if (!args.headers["Accept"]) {
+        args.headers["Accept"] = "application/vnd.github.v3+json";
+      }
+
+      args.path = "https://api.github.com".concat(args.path);
+      return request(args);
+    }
+
+    function list(_x) {
+      return _list.apply(this, arguments);
+    }
+
+    function _list() {
+      _list = _asyncToGenerator(function* (file) {
+        // FIXME: This API has an upper limit of 1,000 files for a directory. If you need to retrieve more files, use the Git Trees API.
+        const result = yield requestAPI({
+          path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file)
+        });
+        const names = [];
+        var _iteratorNormalCompletion = true;
+        var _didIteratorError = false;
+        var _iteratorError = undefined;
+
+        try {
+          for (var _iterator = result[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            const item = _step.value;
+            names.push(item.name);
+            shaCache.set(item.path, item.sha);
+          }
+        } catch (err) {
+          _didIteratorError = true;
+          _iteratorError = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion && _iterator.return != null) {
+              _iterator.return();
+            }
+          } finally {
+            if (_didIteratorError) {
+              throw _iteratorError;
+            }
+          }
+        }
+
+        return names;
+      });
+      return _list.apply(this, arguments);
+    }
+
+    function get(_x2) {
+      return _get.apply(this, arguments);
+    }
+
+    function _get() {
+      _get = _asyncToGenerator(function* (file) {
+        // FIXME: This API supports files up to 1 megabyte in size.
+        const result = yield requestAPI({
+          path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file)
+        });
+        shaCache.set(result.path, result.sha);
+        return _module_exports_.decode(result.content);
+      });
+      return _get.apply(this, arguments);
+    }
+
+    function put(_x3, _x4) {
+      return _put.apply(this, arguments);
+    }
+
+    function _put() {
+      _put = _asyncToGenerator(function* (file, data, overwrite = true) {
+        const params = {
+          message: "",
+          content: _module_exports_.encode(data)
+        };
+
+        if (overwrite && shaCache.has(file)) {
+          params.sha = shaCache.get(file);
+        }
+
+        const args = {
+          method: "PUT",
+          path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file),
+          contentType: "application/json",
+          body: JSON.stringify(params)
+        };
+        let retried = false;
+        let result;
+
+        while (!result) {
+          try {
+            result = yield requestAPI(args);
+          } catch (err) {
+            if (err.code !== 422 || !err.message.includes("\\\"sha\\\" wasn't supplied")) {
+              throw err;
+            }
+
+            if (!overwrite || retried) {
+              err.code = "EEXIST";
+              throw err;
+            }
+
+            yield get(file);
+          }
+
+          retried = true;
+        }
+
+        shaCache.set(file, result.content.sha);
+      });
+      return _put.apply(this, arguments);
+    }
+
+    function post(file, data) {
+      return put(file, data, false);
+    }
+
+    function delete_(_x5) {
+      return _delete_.apply(this, arguments);
+    }
+
+    function _delete_() {
+      _delete_ = _asyncToGenerator(function* (file) {
+        try {
+          let sha = shaCache.get(file);
+
+          if (!sha) {
+            yield get(file);
+            sha = shaCache.get(file);
+          }
+
+          yield requestAPI({
+            method: "DELETE",
+            path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file),
+            body: JSON.stringify({
+              message: "",
+              sha
+            })
+          });
+        } catch (err) {
+          if (err.code === 404) {
+            return;
+          } // FIXME: do we have to handle 422 errors?
+
+
+          throw err;
+        }
+      });
+      return _delete_.apply(this, arguments);
+    }
+  }
+
+  function createDrive$1({
+    getAccessToken,
+    fetch = (typeof self !== "undefined" ? self : global).fetch
+  }) {
+    const request = createRequest({
+      fetch,
+      getAccessToken
+    });
+    return {
+      name: "dropbox",
+      get,
+      put,
+      post,
+      delete: delete_,
+      list
+    };
+
+    function requestRPC(_ref) {
+      let path = _ref.path,
+          body = _ref.body,
+          args = _objectWithoutProperties(_ref, ["path", "body"]);
+
+      return request(_objectSpread2({
+        method: "POST",
+        path: "https://api.dropboxapi.com/2/".concat(path),
+        contentType: "application/json",
+        body: JSON.stringify(body)
+      }, args));
+    }
+
+    function list(_x) {
+      return _list.apply(this, arguments);
+    }
+
+    function _list() {
+      _list = _asyncToGenerator(function* (file) {
+        const names = [];
+        let result = yield requestRPC({
+          path: "files/list_folder",
+          body: {
+            path: "/".concat(file)
+          }
+        });
+        var _iteratorNormalCompletion = true;
+        var _didIteratorError = false;
+        var _iteratorError = undefined;
+
+        try {
+          for (var _iterator = result.entries[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            const entry = _step.value;
+            names.push(entry.name);
+          }
+        } catch (err) {
+          _didIteratorError = true;
+          _iteratorError = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion && _iterator.return != null) {
+              _iterator.return();
+            }
+          } finally {
+            if (_didIteratorError) {
+              throw _iteratorError;
+            }
+          }
+        }
+
+        if (!result.has_more) {
+          return names;
+        }
+
+        while (result.has_more) {
+          result = yield requestRPC({
+            path: "files/list_folder/continue",
+            body: {
+              cursor: result.cursor
+            }
+          });
+          var _iteratorNormalCompletion2 = true;
+          var _didIteratorError2 = false;
+          var _iteratorError2 = undefined;
+
+          try {
+            for (var _iterator2 = result.entries[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+              const entry = _step2.value;
+              names.push(entry.name);
+            }
+          } catch (err) {
+            _didIteratorError2 = true;
+            _iteratorError2 = err;
+          } finally {
+            try {
+              if (!_iteratorNormalCompletion2 && _iterator2.return != null) {
+                _iterator2.return();
+              }
+            } finally {
+              if (_didIteratorError2) {
+                throw _iteratorError2;
+              }
+            }
+          }
+        }
+
+        return names;
+      });
+      return _list.apply(this, arguments);
+    }
+
+    function stringifyParams(obj) {
+      const params = new URLSearchParams();
+      params.set("arg", JSON.stringify(obj));
+      return params.toString();
+    }
+
+    function get(_x2) {
+      return _get.apply(this, arguments);
+    }
+
+    function _get() {
+      _get = _asyncToGenerator(function* (file) {
+        const params = {
+          path: "/".concat(file)
+        };
+
+        try {
+          return yield request({
+            path: "https://content.dropboxapi.com/2/files/download?".concat(stringifyParams(params)),
+            format: "text"
+          });
+        } catch (err) {
+          if (err.code === 409 && err.message.includes("not_found")) {
+            err.code = "ENOENT";
+          }
+
+          throw err;
+        }
+      });
+      return _get.apply(this, arguments);
+    }
+
+    function put(_x3, _x4) {
+      return _put.apply(this, arguments);
+    }
+
+    function _put() {
+      _put = _asyncToGenerator(function* (file, data, mode = "overwrite") {
+        const params = {
+          path: "/".concat(file),
+          mode,
+          autorename: false
+        };
+        yield request({
+          path: "https://content.dropboxapi.com/2/files/upload?".concat(stringifyParams(params)),
+          method: "POST",
+          contentType: "application/octet-stream",
+          body: data
+        });
+      });
+      return _put.apply(this, arguments);
+    }
+
+    function post(_x5, _x6) {
+      return _post.apply(this, arguments);
+    }
+
+    function _post() {
+      _post = _asyncToGenerator(function* (file, data) {
+        try {
+          return yield put(file, data, "add");
+        } catch (err) {
+          if (err.code === 409 && err.message.includes("conflict")) {
+            err.code = "EEXIST";
+          }
+
+          throw err;
+        }
+      });
+      return _post.apply(this, arguments);
+    }
+
+    function delete_(_x7) {
+      return _delete_.apply(this, arguments);
+    }
+
+    function _delete_() {
+      _delete_ = _asyncToGenerator(function* (file) {
+        try {
+          yield requestRPC({
+            path: "files/delete_v2",
+            body: {
+              path: "/".concat(file)
+            }
+          });
+        } catch (err) {
+          if (err.code === 409 && err.message.includes("not_found")) {
+            return;
+          }
+
+          throw err;
+        }
+      });
+      return _delete_.apply(this, arguments);
+    }
+  }
+
+  function createDrive$2({
+    getAccessToken,
+    fetch = (typeof self !== "undefined" ? self : global).fetch
+  }) {
+    const request = createRequest({
+      fetch,
+      getAccessToken
+    });
+    return {
+      name: "onedrive",
+      get,
+      put,
+      post,
+      delete: delete_,
+      list
+    };
+
+    function query(_x) {
+      return _query.apply(this, arguments);
+    }
+
+    function _query() {
+      _query = _asyncToGenerator(function* (args) {
+        args.path = "https://graph.microsoft.com/v1.0/me/drive/special/approot".concat(args.path);
+        return yield request(args);
+      });
+      return _query.apply(this, arguments);
+    }
+
+    function list(_x2) {
+      return _list.apply(this, arguments);
+    }
+
+    function _list() {
+      _list = _asyncToGenerator(function* (file) {
+        if (file) {
+          file = ":/".concat(file, ":");
+        }
+
+        const result = yield query({
+          path: "".concat(file, "/children?select=name")
+        });
+        return result.value.map(i => i.name);
+      });
+      return _list.apply(this, arguments);
+    }
+
+    function get(_x3) {
+      return _get.apply(this, arguments);
+    }
+
+    function _get() {
+      _get = _asyncToGenerator(function* (file) {
+        return yield query({
+          path: ":/".concat(file, ":/content"),
+          format: "text"
+        });
+      });
+      return _get.apply(this, arguments);
+    }
+
+    function put(_x4, _x5) {
+      return _put.apply(this, arguments);
+    }
+
+    function _put() {
+      _put = _asyncToGenerator(function* (file, data) {
+        yield query({
+          method: "PUT",
+          path: ":/".concat(file, ":/content"),
+          headers: {
+            "Content-Type": "text/plain"
+          },
+          body: data
+        });
+      });
+      return _put.apply(this, arguments);
+    }
+
+    function post(_x6, _x7) {
+      return _post.apply(this, arguments);
+    }
+
+    function _post() {
+      _post = _asyncToGenerator(function* (file, data) {
+        try {
+          yield query({
+            method: "PUT",
+            path: ":/".concat(file, ":/content?@microsoft.graph.conflictBehavior=fail"),
+            headers: {
+              "Content-Type": "text/plain"
+            },
+            body: data
+          });
+        } catch (err) {
+          if (err.code === 409 && err.message.includes("nameAlreadyExists")) {
+            err.code = "EEXIST";
+          }
+
+          throw err;
+        }
+      });
+      return _post.apply(this, arguments);
+    }
+
+    function delete_(_x8) {
+      return _delete_.apply(this, arguments);
+    }
+
+    function _delete_() {
+      _delete_ = _asyncToGenerator(function* (file) {
+        try {
+          yield query({
+            method: "DELETE",
+            path: ":/".concat(file, ":")
+          });
+        } catch (err) {
+          if (err.code === 404) {
+            return;
+          }
+
+          throw err;
+        }
+      });
+      return _delete_.apply(this, arguments);
+    }
+  }
+
+  function createDrive$3({
+    getAccessToken,
+    fetch = (typeof self !== "undefined" ? self : global).fetch,
+    FormData = (typeof self !== "undefined" ? self : global).FormData,
+    Blob = (typeof self !== "undefined" ? self : global).Blob
+  }) {
+    const request = createRequest({
+      fetch,
+      getAccessToken
+    });
+    const fileMetaCache = new Map();
+    let lockRev;
+    return {
+      name: "google",
+      get,
+      put,
+      post,
+      delete: delete_,
+      list,
+      init,
+      acquireLock,
+      releaseLock,
+      fileMetaCache
+    };
+
+    function revDelete(_x, _x2) {
+      return _revDelete.apply(this, arguments);
+    }
+
+    function _revDelete() {
+      _revDelete = _asyncToGenerator(function* (fileId, revId) {
+        yield request({
+          method: "DELETE",
+          path: "https://www.googleapis.com/drive/v3/files/".concat(fileId, "/revisions/").concat(revId)
+        });
+      });
+      return _revDelete.apply(this, arguments);
+    }
+
+    function acquireLock(_x3) {
+      return _acquireLock.apply(this, arguments);
+    }
+
+    function _acquireLock() {
+      _acquireLock = _asyncToGenerator(function* (expire) {
+        const lock = fileMetaCache.get("lock.json");
+
+        const _ref = yield queryPatch(lock.id, JSON.stringify({
+          expire: Date.now() + expire * 60 * 1000
+        })),
+              headRevisionId = _ref.headRevisionId;
+
+        const result = yield request({
+          path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions?fields=revisions(id)")
+        });
+
+        for (let i = 1; i < result.revisions.length; i++) {
+          const revId = result.revisions[i].id;
+
+          if (revId === headRevisionId) {
+            // success
+            lockRev = headRevisionId;
+            return;
+          }
+
+          const rev = JSON.parse((yield request({
+            path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions/").concat(revId, "?alt=media")
+          })));
+
+          if (rev.expire > Date.now()) {
+            // failed, delete the lock
+            yield revDelete(lock.id, headRevisionId);
+            throw new RequestError("failed to acquire lock", null, "EEXIST");
+          } // delete outdated lock
+
+
+          yield revDelete(lock.id, revId);
+        }
+
+        throw new Error("cannot find lock revision");
+      });
+      return _acquireLock.apply(this, arguments);
+    }
+
+    function releaseLock() {
+      return _releaseLock.apply(this, arguments);
+    }
+
+    function _releaseLock() {
+      _releaseLock = _asyncToGenerator(function* () {
+        const lock = fileMetaCache.get("lock.json");
+        yield revDelete(lock.id, lockRev);
+        lockRev = null;
+      });
+      return _releaseLock.apply(this, arguments);
+    }
+
+    function queryList(_x4, _x5) {
+      return _queryList.apply(this, arguments);
+    }
+
+    function _queryList() {
+      _queryList = _asyncToGenerator(function* (path, onPage) {
+        path = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=nextPageToken,files(id,name,headRevisionId)" + (path ? "&" + path : "");
+        let result = yield request({
+          path
+        });
+        onPage(result);
+
+        while (result.nextPageToken) {
+          result = yield request({
+            path: "".concat(path, "&pageToken=").concat(result.nextPageToken)
+          });
+          onPage(result);
+        }
+      });
+      return _queryList.apply(this, arguments);
+    }
+
+    function queryPatch(_x6, _x7) {
+      return _queryPatch.apply(this, arguments);
+    }
+
+    function _queryPatch() {
+      _queryPatch = _asyncToGenerator(function* (id, text) {
+        return yield request({
+          method: "PATCH",
+          path: "https://www.googleapis.com/upload/drive/v3/files/".concat(id, "?uploadType=media&fields=headRevisionId"),
+          headers: {
+            "Content-Type": "text/plain"
+          },
+          body: text
+        });
+      });
+      return _queryPatch.apply(this, arguments);
+    }
+
+    function updateMeta(_x8) {
+      return _updateMeta.apply(this, arguments);
+    }
+
+    function _updateMeta() {
+      _updateMeta = _asyncToGenerator(function* (query) {
+        if (query) {
+          query = "q=".concat(encodeURIComponent(query));
+        }
+
+        yield queryList(query, result => {
+          var _iteratorNormalCompletion = true;
+          var _didIteratorError = false;
+          var _iteratorError = undefined;
+
+          try {
+            for (var _iterator = result.files[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+              const file = _step.value;
+              fileMetaCache.set(file.name, file);
+            }
+          } catch (err) {
+            _didIteratorError = true;
+            _iteratorError = err;
+          } finally {
+            try {
+              if (!_iteratorNormalCompletion && _iterator.return != null) {
+                _iterator.return();
+              }
+            } finally {
+              if (_didIteratorError) {
+                throw _iteratorError;
+              }
+            }
+          }
+        });
+      });
+      return _updateMeta.apply(this, arguments);
+    }
+
+    function init() {
+      return _init.apply(this, arguments);
+    }
+
+    function _init() {
+      _init = _asyncToGenerator(function* () {
+        yield updateMeta();
+
+        if (!fileMetaCache.has("lock.json")) {
+          yield post("lock.json", "{}");
+        }
+
+        if (!fileMetaCache.has("meta.json")) {
+          yield post("meta.json", "{}");
+        }
+      });
+      return _init.apply(this, arguments);
+    }
+
+    function list(_x9) {
+      return _list.apply(this, arguments);
+    }
+
+    function _list() {
+      _list = _asyncToGenerator(function* (file) {
+        // FIXME: this only works if file is a single dir
+        // FIXME: this only works if the list method is called right after init, use
+        // queryList instead?
+        return [...fileMetaCache.values()].filter(f => f.name.startsWith(file + "/")).map(f => f.name.split("/")[1]);
+      });
+      return _list.apply(this, arguments);
+    }
+
+    function get(_x10) {
+      return _get.apply(this, arguments);
+    }
+
+    function _get() {
+      _get = _asyncToGenerator(function* (file) {
+        let meta = fileMetaCache.get(file);
+
+        if (!meta) {
+          yield updateMeta("name = '".concat(file, "'"));
+          meta = fileMetaCache.get(file);
+
+          if (!meta) {
+            throw new RequestError("metaCache doesn't contain ".concat(file), null, "ENOENT");
+          }
+        }
+
+        try {
+          return yield request({
+            path: "https://www.googleapis.com/drive/v3/files/".concat(meta.id, "?alt=media")
+          });
+        } catch (err) {
+          if (err.code === 404) {
+            err.code = "ENOENT";
+          }
+
+          throw err;
+        }
+      });
+      return _get.apply(this, arguments);
+    }
+
+    function put(_x11, _x12) {
+      return _put.apply(this, arguments);
+    }
+
+    function _put() {
+      _put = _asyncToGenerator(function* (file, data) {
+        if (!fileMetaCache.has(file)) {
+          return yield post(file, data);
+        }
+
+        const meta = fileMetaCache.get(file);
+        const result = yield queryPatch(meta.id, data);
+        meta.headRevisionId = result.headRevisionId;
+      });
+      return _put.apply(this, arguments);
+    }
+
+    function post(_x13, _x14) {
+      return _post.apply(this, arguments);
+    }
+
+    function _post() {
+      _post = _asyncToGenerator(function* (file, data) {
+        const body = new FormData();
+        const meta = {
+          name: file,
+          parents: ["appDataFolder"]
+        };
+        body.append("metadata", new Blob([JSON.stringify(meta)], {
+          type: "application/json; charset=UTF-8"
+        }));
+        body.append("media", new Blob([data], {
+          type: "text/plain"
+        }));
+        const result = yield request({
+          method: "POST",
+          path: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,headRevisionId",
+          body
+        });
+        fileMetaCache.set(result.name, result);
+      });
+      return _post.apply(this, arguments);
+    }
+
+    function delete_(_x15) {
+      return _delete_.apply(this, arguments);
+    }
+
+    function _delete_() {
+      _delete_ = _asyncToGenerator(function* (file) {
+        const meta = fileMetaCache.get(file);
+
+        if (!meta) {
+          return;
+        }
+
+        try {
+          yield request({
+            method: "DELETE",
+            path: "https://www.googleapis.com/drive/v3/files/".concat(meta.id)
+          });
+        } catch (err) {
+          if (err.code === 404) {
+            return;
+          }
+
+          throw err;
+        }
+      });
+      return _delete_.apply(this, arguments);
+    }
+  }
+
+
+
+  var index = /*#__PURE__*/Object.freeze({
+    fsDrive: empty,
+    github: createDrive,
+    dropbox: createDrive$1,
+    onedrive: createDrive$2,
+    google: createDrive$3
+  });
 
   exports.dbToCloud = dbToCloud;
   exports.drive = index;
