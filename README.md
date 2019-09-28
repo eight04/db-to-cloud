@@ -99,8 +99,10 @@ sync.use(cloud);
 try {
   await sync.start();
 } catch (err) {
-  // handle login/connection errors?
-  // ...
+  if (err.code === 401) {
+    // handle login error, revoke the token
+    // ...
+  }
 }
 
 // trigger sync every 30 minutes
@@ -277,30 +279,28 @@ The browser build doesn't include this adapter.
 ```js
 dropbox({
   getAccessToken: async () => token: String,
-  getDropbox?: async () => Dropbox,
-  clientId: String,
-  fetch?
+  fetch?: Function
 }) => CloudAdapter
 ```
 
 This adapter stores data to Dropbox.
 
-The browser build doesn't include [dropbox SDK](https://github.com/dropbox/dropbox-sdk-js), you have to send the `Dropbox` class to the adapter manually.
+If `fetch` is not supplied, use global variable `fetch`.
 
 ### github
 
 ```js
 github({
   getAccessToken: async () => token: String,
-  getOctokit?: async () => Octokit
   owner: String,
-  repo: String
+  repo: String,
+  fetch?: Function
 }) => CloudAdapter
 ```
 
 This adapter stores data to Github repository `owner/repo`.
 
-The browser build doesn't include [octokit REST API](https://github.com/octokit/rest.js), you have to send the `Octokit` class to the adapter manually.
+If `fetch` is not supplied, use global variable `fetch`.
 
 ### google
 
@@ -315,6 +315,8 @@ google({
 
 This adapter stores data to Google Drive.
 
+If `fetch`/`FormData`/`Blob` is not supplied, use the global variable.
+
 ### onedrive
 
 ```js
@@ -326,108 +328,112 @@ onedrive({
 
 This adapter stores data to OneDrive.
 
-Create a customized cloud drive adapter
----------------------------------------
+If `fetch` is not supplied, use the global variable.
 
-To create a working adapter, implement following methods:
+User-defined cloud drive adapter
+--------------------------------
 
-### init, uninit
+To create a working adapter, create an object with following methods:
 
-```js
-async drive.init() => void
+* *init, uninit*
 
-async drive.uninit() => void
-```
+    ```js
+    async drive.init() => void
 
-Optional. These hooks will be called when `sync.start`/`sync.stop`. If the adapter uses a large dependency, it should be dynamically loaded in `init`.
+    async drive.uninit() => void
+    ```
 
-### get
+    Optional. These hooks will be called when `sync.start`/`sync.stop`. If the adapter uses a large dependency, it should be dynamically loaded in `init`.
 
-```js
-async drive.get(path: String) => data: String
-```
+* *get*
 
-Read the data from the drive.
+    ```js
+    async drive.get(path: String) => data: String
+    ```
 
-If the path doesn't exist, an error should be thrown and the `code` property should be a string `"ENOENT"` or a number `404`.
+    Read the data from the drive.
 
-### put
+    If the path doesn't exist, an error should be thrown and the `code` property should be a string `"ENOENT"` or a number `404`.
 
-```js
-async drive.put(path: String, data: String) => void
-```
+* *put*
 
-Write the data to the drive. The drive should create parent folders automatically.
+    ```js
+    async drive.put(path: String, data: String) => void
+    ```
 
-If the path already exists, it should overwrite the old file.
+    Write the data to the drive. The drive should create parent folders automatically.
 
-### post
+    If the path already exists, it should overwrite the old file.
 
-```js
-async drive.post(path: String, data: String) => void
-```
+* *post*
 
-Write the data to the drive. The drive should create parent folders automatically.
+    ```js
+    async drive.post(path: String, data: String) => void
+    ```
 
-If the path already exists, an error should be thrown and the `code` property should be a string `"EEXIST"`.
+    Write the data to the drive. The drive should create parent folders automatically.
 
-### delete
+    If the path already exists, an error should be thrown and the `code` property should be a string `"EEXIST"`.
 
-```js
-async drive.delete(path: String) => void
-```
+* *delete*
 
-Delete a file. If the path doesn't exist, this function does nothing.
+    ```js
+    async drive.delete(path: String) => void
+    ```
 
-### list
+    Delete a file. If the path doesn't exist, this function does nothing.
 
-```js
-async drive.list(path: String) => Array<filename: String>
-```
+* *list*
 
-List all files in the folder. This is used on the first sync since we have to fetch all documents from the drive.
+    ```js
+    async drive.list(path: String) => Array<filename: String>
+    ```
 
-Currently, only the `docs` folder will be requested.
+    List all files in the folder. This is used on the first sync since we have to fetch all documents from the drive.
 
-If the path doesn't exist, it can throw an ENOENT/404 error or return an empty array.
+    Currently, only the `docs` folder will be requested.
 
-### acquireLock, releaseLock
+    If the path doesn't exist, it can throw an ENOENT/404 error or return an empty array.
 
-```js
-async drive.acquireLock(expire: Number) => void
+* *acquireLock, releaseLock*
 
-async drive.releaseLock() => void
-```
+    ```js
+    async drive.acquireLock(expire: Number) => void
 
-Optional. The lock is acquired when a sync task starts, and is released after the sync task completes.
+    async drive.releaseLock() => void
+    ```
 
-If these methods are not implemented, the library uses a file-based lock `lock.json` storing in the drive, using `post`, `delete`, and `get` methods.
+    Optional. The lock is acquired when a sync task starts, and is released after the sync task completes.
 
-`expire` defines the lifetime of the lock. If the sync task is interrupted and the lock is never released manually, the lock should be unlocked after `expire` minutes.
+    If these methods are not implemented, the library uses a file-based lock `lock.json` storing in the drive, using `post`, `delete`, and `get` methods.
 
-### getMeta, putMeta
+    `expire` defines the lifetime of the lock. If the sync task is interrupted and the lock is never released manually, the lock should be unlocked after `expire` minutes.
 
-```js
-async drive.getMeta() => Object
+* *getMeta, putMeta*
 
-async drive.putMeta(meta: Object) => void
-```
+    ```js
+    async drive.getMeta() => Object
 
-Optional. Save/store metadata in the server.
+    async drive.putMeta(meta: Object) => void
+    ```
 
-If these methods are not implemented, the library stores the metadata as `meta.json` in the drive.
+    Optional. Save/store metadata in the server.
 
-If the metadata is not set yet i.e. the first sync, `getMeta` should return an empty object `{}`.
+    If these methods are not implemented, the library stores the metadata as `meta.json` in the drive.
 
-### peekChanges
+    If the metadata is not set yet i.e. the first sync, `getMeta` should return an empty object `{}`.
 
-```js
-async drive.peekChanges() => Boolean
-```
+* *peekChanges*
 
-Optional. Check if the cloud has been changed.
+    ```js
+    async drive.peekChanges() => Boolean
+    ```
 
-If this method is not implemented, the library `getMeta()` and check if the metadata is changed.
+    Optional. Check if the cloud has been changed.
+
+    If this method is not implemented, the library `getMeta()` and check if the metadata is changed.
+    
+If your adapter uses an access token, make sure to throw a proper authentication error when authentication failed. The error object should have a `code` property and the value must be a number `401` (the HTTP status code of the auth error). You can use the `db-to-cloud/lib/request` module.
 
 Changelog
 ---------
