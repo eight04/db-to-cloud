@@ -438,7 +438,7 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
-* 0.2.0 (Sep 28, 2019)
+* 0.2.0 (Sep 29, 2019)
 
   - Breaking: drop dropbox/github SDK.
   - Change: disable babel-regenerator. The browser build now includes generator functions.
