@@ -108,7 +108,8 @@ const ADAPTERS = [
       const drive = github({
         owner: process.env.GITHUB_OWNER,
         repo: "_db_to_cloud_test",
-        getAccessToken: () => process.env.GITHUB_ACCESS_TOKEN
+        getAccessToken: () => process.env.GITHUB_ACCESS_TOKEN,
+        fetch
       });
       if (!this.drive) {
         this.drive = drive;
@@ -314,7 +315,7 @@ describe("functional", () => {
   const instances = [];
   
   afterEach(async function () {
-    this.timeout(10 * 1000);
+    this.timeout(20 * 1000);
     for (const ctrl of instances) {
       await ctrl.stop();
     }
