@@ -438,6 +438,10 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
+* 0.3.0 (Sep 30, 2019)
+
+  - **Breaking: the file structure stored in the drive is changed. Store revision tag along with the doc.**
+
 * 0.2.0 (Sep 29, 2019)
 
   - Breaking: drop dropbox/github SDK.
