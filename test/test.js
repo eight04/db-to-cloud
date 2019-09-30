@@ -225,7 +225,7 @@ async function suite(prepare) {
   {
     const meta = await sync.drive().getMeta();
     assert.equal(meta.lastChange, 2);
-    const doc = JSON.parse(await drive.get("docs/2.json"));
+    const {doc} = JSON.parse(await drive.get("docs/2.json"));
     assert.deepStrictEqual(doc, data[2]);
     const changes = JSON.parse(await drive.get("changes/0.json"));
     assert.deepStrictEqual(changes, [
