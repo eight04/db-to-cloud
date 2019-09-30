@@ -628,13 +628,16 @@ var dbToCloud = (function (exports) {
                   id = _step2$value[0],
                   change = _step2$value[1];
 
+            let doc, _rev;
+
             if (change.action === "delete") {
               yield onDelete(id, change._rev);
             } else if (change.action === "put") {
-              let doc;
-
               try {
-                doc = yield _drive2.get("docs/".concat(id, ".json"));
+                var _ref5 = yield _drive2.get("docs/".concat(id, ".json"));
+
+                doc = _ref5.doc;
+                _rev = _ref5._rev;
               } catch (err) {
                 if (err.code === "ENOENT" || err.code === 404) {
                   onWarn("Cannot find ".concat(id, ". Is it deleted without updating the history?"));
@@ -648,8 +651,10 @@ var dbToCloud = (function (exports) {
             } // record the remote revision
 
 
-            if (change._rev) {
-              revisionCache.set(id, change._rev);
+            const rev = change._rev || _rev;
+
+            if (rev) {
+              revisionCache.set(id, rev);
             }
           }
         } catch (err) {
@@ -734,7 +739,11 @@ var dbToCloud = (function (exports) {
             if (change.action === "delete") {
               yield _drive2.delete("docs/".concat(id, ".json"));
             } else if (change.action === "put") {
-              yield _drive2.put("docs/".concat(id, ".json"), (yield onGet(id, change._rev)));
+              const doc = yield onGet(id, change._rev);
+              yield _drive2.put("docs/".concat(id, ".json"), {
+                doc,
+                _rev: change._rev
+              });
             }
 
             revisionCache.set(id, change._rev);
