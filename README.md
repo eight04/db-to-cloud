@@ -79,10 +79,6 @@ const sync = dbToCloud({
   },
   async setState(drive, state) {
     localStorage.setItem(`cloudSync/${drive.name}/state`, JSON.stringify(state));
-  },
-  
-  onError(err) {
-    console.error(err);
   }
 });
 
@@ -171,7 +167,8 @@ dbToCloud({
   getState: async (drive) => state: Object,
   setState: async (drive, state) => void,
   
-  onWarn: (message: String) => void,
+  onWarn?: (message: String) => void,
+  onProgress?: (type: String, change) => void,
   
   lockExpire?: Number
 }) => sync: SyncController
@@ -183,13 +180,15 @@ Create a sync controller. [Usage example](#setup).
 
 `onDelete` also accept a revision tag. You can use it to decide if the deletion take place or should be ignored.
 
-Use `onWarn` to collect warnings. Default: `console.error`
-
 `onFirstSync` is called on the first sync. You can push all local documents to the cloud in this hook.
 
 `compareRevision` is used to decide which revision should be kept. If `cmpResult > 0` then `revision1` wins. If `cmpResult < 0` then `revision2` wins.
 
 `getState` and `setState` are used to get/store the current state of the sync process. You should save the state object to a file or `localStorage`. If `getState` returns `undefined` then it is the first sync. `drive` is a cloud drive adapter instance. You can get the drive name from `drive.name`.
+
+Use `onWarn` to collect warnings. Default: `console.error`
+
+Use `onProgress` to collect sync progress. `type` can be `"syncStart"`, `"syncEnd"`, `"syncPull"`, or `"syncPush"`. The `change` object has an `_id` properties. You can use it to determine which document is being pulled/pushed.
 
 When syncing, the controller will lock the cloud drive. However, if the process is interrupted (e.g. crashed) and failed to unlock, the lock will expire after `lockExpire` minutes. Default: `60`.
 
