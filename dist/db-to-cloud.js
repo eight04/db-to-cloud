@@ -479,6 +479,7 @@ var dbToCloud = (function (exports) {
     onDelete,
     onFirstSync,
     onWarn = console.error,
+    onProgress = () => {},
     compareRevision,
     getState,
     setState,
@@ -633,6 +634,8 @@ var dbToCloud = (function (exports) {
             if (change.action === "delete") {
               yield onDelete(id, change._rev);
             } else if (change.action === "put") {
+              onProgress('syncPull', change);
+
               try {
                 var _ref5 = yield _drive2.get("docs/".concat(id, ".json"));
 
@@ -736,6 +739,8 @@ var dbToCloud = (function (exports) {
               continue;
             }
 
+            onProgress('syncPush', change);
+
             if (change.action === "delete") {
               yield _drive2.delete("docs/".concat(id, ".json"));
             } else if (change.action === "put") {
@@ -748,7 +753,8 @@ var dbToCloud = (function (exports) {
 
             revisionCache.set(id, change._rev);
             newChanges.push(change);
-          } // push changes
+          } // FIXME: there should be no need to push data when !newChanges.length
+          // push changes
 
         } catch (err) {
           _didIteratorError4 = true;
@@ -827,15 +833,21 @@ var dbToCloud = (function (exports) {
         yield lock.write(
         /*#__PURE__*/
         _asyncToGenerator(function* () {
-          if (!state.queue.length && peek && meta) {
-            const changed = yield _drive2.peekChanges(meta);
+          onProgress('syncStart');
 
-            if (!changed) {
-              return;
+          try {
+            if (!state.queue.length && peek && meta) {
+              const changed = yield _drive2.peekChanges(meta);
+
+              if (!changed) {
+                return;
+              }
             }
-          }
 
-          yield sync();
+            yield sync();
+          } finally {
+            onProgress('syncEnd');
+          }
         }));
       });
       return _syncNow.apply(this, arguments);
