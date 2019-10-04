@@ -26,6 +26,7 @@
   "devDependencies": {
     "@babel/core": "^7.6.2",
     "@babel/preset-env": "^7.6.2",
+    "assert-set": "^0.1.0",
     "c8": "^5.0.4",
     "clipboardy": "^2.1.0",
     "dotenv": "^8.1.0",

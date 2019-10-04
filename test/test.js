@@ -10,6 +10,7 @@ const logger = require("mocha-logger");
 const fetch = require("make-fetch-happen");
 const clipboardy = require("clipboardy");
 const FormData = require("form-data");
+const assertSet = require("assert-set");
 
 const {dbToCloud, drive: {fsDrive, github, dropbox, onedrive, google}} = require("..");
 
@@ -278,22 +279,23 @@ async function suite(prepare) {
 
   logger.log("start and sync with the second instance");
 
-  const {sync: sync2, data: data2} = prepare();
+  const {sync: sync2, data: data2, options: options2} = prepare();
   await sync2.start();
   assert.deepStrictEqual(data2, data);
   {
-    const args = options.onProgress.getCalls().map(c => c.args[0]);
-    assert.deepStrictEqual(args, [
-      {
-        phase: 'start'
-      },
+    const args = options2.onProgress.getCalls().map(c => c.args[0]);
+    assert.equal(args.length, 4);
+    assert.deepStrictEqual(args[0], {phase: 'start'});
+    assert.deepStrictEqual(args[3], {phase: 'end'});
+    // we don't care about the order
+    assertSet.equal(args.slice(1, -1), [
       {
         phase: 'pull',
         total: 2,
         loaded: 0,
         change: {
-          _id: 1,
-          _rev: 1,
+          // FIXME: https://github.com/eight04/db-to-cloud/issues/6
+          _id: "1",
           action: "put"
         }
       },
@@ -302,13 +304,9 @@ async function suite(prepare) {
         total: 2,
         loaded: 1,
         change: {
-          _id: 2,
-          _rev: 1,
+          _id: "2",
           action: "put"
         }
-      },
-      {
-        phase: "end"
       }
     ]);
   }
