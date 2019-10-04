@@ -197,7 +197,7 @@ Use `onProgress` to collect sync progress. The type of `progressEvent`:
   loaded?: Number,
   change?: {
     _id,
-    _rev,
+    _rev?,
     action
   }
 }
@@ -211,6 +211,8 @@ Use `onProgress` to collect sync progress. The type of `progressEvent`:
 * `push` - start pushing a change.
 
 When the phase is `pull` or `push`, `total` and `loaded` indicates how many changes should be processed and how many changes completed in the current phase.
+
+Note that `change._rev` is undefined in the first pull. The library doesn't know the revision until the data is fetched.
 
 When the sync task starts, the cloud drive will be locked. However, if the process is interrupted (e.g. the browser crashed) and failed to unlock, the lock will expire after `lockExpire` minutes. Default: `60`.
 
