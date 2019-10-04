@@ -197,7 +197,8 @@ Use `onProgress` to collect sync progress. The type of `progressEvent`:
   loaded?: Number,
   change?: {
     _id,
-    _rev
+    _rev,
+    action
   }
 }
 ```

@@ -240,6 +240,35 @@ async function suite(prepare) {
         action: "put"
       }
     ]);
+    const args = options.onProgress.getCalls().map(c => c.args[0]);
+    assert.deepStrictEqual(args, [
+      {
+        phase: 'start'
+      },
+      {
+        phase: 'push',
+        total: 2,
+        loaded: 0,
+        change: {
+          _id: 1,
+          _rev: 1,
+          action: "put"
+        }
+      },
+      {
+        phase: 'push',
+        total: 2,
+        loaded: 1,
+        change: {
+          _id: 2,
+          _rev: 1,
+          action: "put"
+        }
+      },
+      {
+        phase: "end"
+      }
+    ]);
   }
 
   logger.log("getState/setState should be able to access drive name");
@@ -252,6 +281,37 @@ async function suite(prepare) {
   const {sync: sync2, data: data2} = prepare();
   await sync2.start();
   assert.deepStrictEqual(data2, data);
+  {
+    const args = options.onProgress.getCalls().map(c => c.args[0]);
+    assert.deepStrictEqual(args, [
+      {
+        phase: 'start'
+      },
+      {
+        phase: 'pull',
+        total: 2,
+        loaded: 0,
+        change: {
+          _id: 1,
+          _rev: 1,
+          action: "put"
+        }
+      },
+      {
+        phase: 'pull',
+        total: 2,
+        loaded: 1,
+        change: {
+          _id: 2,
+          _rev: 1,
+          action: "put"
+        }
+      },
+      {
+        phase: "end"
+      }
+    ]);
+  }
 
   logger.log("change should flow to other instances");
 
@@ -376,6 +436,7 @@ describe("functional", () => {
           sync.put(doc._id, doc._rev);
         }
       }),
+      onProgress: sinon.spy(),
       compareRevision,
       getState: sinon.spy(),
       setState: sinon.spy()
