@@ -287,28 +287,27 @@ async function suite(prepare) {
     assert.equal(args.length, 4);
     assert.deepStrictEqual(args[0], {phase: 'start'});
     assert.deepStrictEqual(args[3], {phase: 'end'});
+    
+    assert.equal(args[1].phase, 'pull');
+    assert.equal(args[1].total, 2);
+    assert.equal(args[1].loaded, 0);
+    
+    assert.equal(args[2].phase, 'pull');
+    assert.equal(args[2].total, 2);
+    assert.equal(args[2].loaded, 1);
+    
     // we don't care about the order
-    assertSet.equal(args.slice(1, -1), [
+    assertSet.equal([args[1].change, args[2].change], [
       {
-        phase: 'pull',
-        total: 2,
-        loaded: 0,
-        change: {
-          // FIXME: https://github.com/eight04/db-to-cloud/issues/6
-          _id: "1",
-          action: "put"
-        }
+        // FIXME: https://github.com/eight04/db-to-cloud/issues/6
+        _id: "1",
+        action: "put"
       },
       {
-        phase: 'pull',
-        total: 2,
-        loaded: 1,
-        change: {
-          _id: "2",
-          action: "put"
-        }
+        _id: "2",
+        action: "put"
       }
-    ]);
+    ]);    
   }
 
   logger.log("change should flow to other instances");
