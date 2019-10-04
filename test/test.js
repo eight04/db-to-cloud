@@ -10,6 +10,7 @@ const logger = require("mocha-logger");
 const fetch = require("make-fetch-happen");
 const clipboardy = require("clipboardy");
 const FormData = require("form-data");
+const assertSet = require("assert-set");
 
 const {dbToCloud, drive: {fsDrive, github, dropbox, onedrive, google}} = require("..");
 
@@ -240,6 +241,35 @@ async function suite(prepare) {
         action: "put"
       }
     ]);
+    const args = options.onProgress.getCalls().map(c => c.args[0]);
+    assert.deepStrictEqual(args, [
+      {
+        phase: 'start'
+      },
+      {
+        phase: 'push',
+        total: 2,
+        loaded: 0,
+        change: {
+          _id: 1,
+          _rev: 1,
+          action: "put"
+        }
+      },
+      {
+        phase: 'push',
+        total: 2,
+        loaded: 1,
+        change: {
+          _id: 2,
+          _rev: 1,
+          action: "put"
+        }
+      },
+      {
+        phase: "end"
+      }
+    ]);
   }
 
   logger.log("getState/setState should be able to access drive name");
@@ -249,9 +279,36 @@ async function suite(prepare) {
 
   logger.log("start and sync with the second instance");
 
-  const {sync: sync2, data: data2} = prepare();
+  const {sync: sync2, data: data2, options: options2} = prepare();
   await sync2.start();
   assert.deepStrictEqual(data2, data);
+  {
+    const args = options2.onProgress.getCalls().map(c => c.args[0]);
+    assert.equal(args.length, 4);
+    assert.deepStrictEqual(args[0], {phase: 'start'});
+    assert.deepStrictEqual(args[3], {phase: 'end'});
+    
+    assert.equal(args[1].phase, 'pull');
+    assert.equal(args[1].total, 2);
+    assert.equal(args[1].loaded, 0);
+    
+    assert.equal(args[2].phase, 'pull');
+    assert.equal(args[2].total, 2);
+    assert.equal(args[2].loaded, 1);
+    
+    // we don't care about the order
+    assertSet.equal([args[1].change, args[2].change], [
+      {
+        // FIXME: https://github.com/eight04/db-to-cloud/issues/6
+        _id: "1",
+        action: "put"
+      },
+      {
+        _id: "2",
+        action: "put"
+      }
+    ]);    
+  }
 
   logger.log("change should flow to other instances");
 
@@ -376,6 +433,7 @@ describe("functional", () => {
           sync.put(doc._id, doc._rev);
         }
       }),
+      onProgress: sinon.spy(),
       compareRevision,
       getState: sinon.spy(),
       setState: sinon.spy()

@@ -168,7 +168,7 @@ dbToCloud({
   setState: async (drive, state) => void,
   
   onWarn?: (message: String) => void,
-  onProgress?: (type: String, change) => void,
+  onProgress?: (progressEvent: Object) => void,
   
   lockExpire?: Number
 }) => sync: SyncController
@@ -188,9 +188,33 @@ Create a sync controller. [Usage example](#setup).
 
 Use `onWarn` to collect warnings. Default: `console.error`
 
-Use `onProgress` to collect sync progress. `type` can be `"syncStart"`, `"syncEnd"`, `"syncPull"`, or `"syncPush"`. The `change` object has an `_id` properties. You can use it to determine which document is being pulled/pushed.
+Use `onProgress` to collect sync progress. The type of `progressEvent`:
 
-When syncing, the controller will lock the cloud drive. However, if the process is interrupted (e.g. crashed) and failed to unlock, the lock will expire after `lockExpire` minutes. Default: `60`.
+```js
+{
+  phase: String,
+  total?: Number,
+  loaded?: Number,
+  change?: {
+    _id,
+    _rev?,
+    action
+  }
+}
+```
+
+`phase` can be `start`, `end`, `pull`, or `push`:
+
+* `start` - a new sync task starts.
+* `end` - the entire sync task completes.
+* `pull` - start pulling a change.
+* `push` - start pushing a change.
+
+When the phase is `pull` or `push`, `total` and `loaded` indicates how many changes should be processed and how many changes completed in the current phase.
+
+Note that `change._rev` is undefined in the first pull. The library doesn't know the revision until the data is fetched.
+
+When the sync task starts, the cloud drive will be locked. However, if the process is interrupted (e.g. the browser crashed) and failed to unlock, the lock will expire after `lockExpire` minutes. Default: `60`.
 
 ### sync.use
 
