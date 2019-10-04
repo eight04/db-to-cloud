@@ -479,7 +479,7 @@ var dbToCloud = (function (exports) {
     onDelete,
     onFirstSync,
     onWarn = console.error,
-    onProgress = () => {},
+    onProgress,
     compareRevision,
     getState,
     setState,
@@ -619,6 +619,7 @@ var dbToCloud = (function (exports) {
           }
         }
 
+        let loaded = 0;
         var _iteratorNormalCompletion2 = true;
         var _didIteratorError2 = false;
         var _iteratorError2 = undefined;
@@ -631,11 +632,18 @@ var dbToCloud = (function (exports) {
 
             let doc, _rev;
 
+            if (onProgress) {
+              onProgress({
+                phase: 'pull',
+                total: idx.size,
+                loaded,
+                change
+              });
+            }
+
             if (change.action === "delete") {
               yield onDelete(id, change._rev);
             } else if (change.action === "put") {
-              onProgress('syncPull', change);
-
               try {
                 var _ref5 = yield _drive2.get("docs/".concat(id, ".json"));
 
@@ -644,6 +652,7 @@ var dbToCloud = (function (exports) {
               } catch (err) {
                 if (err.code === "ENOENT" || err.code === 404) {
                   onWarn("Cannot find ".concat(id, ". Is it deleted without updating the history?"));
+                  loaded++;
                   continue;
                 }
 
@@ -659,6 +668,8 @@ var dbToCloud = (function (exports) {
             if (rev) {
               revisionCache.set(id, rev);
             }
+
+            loaded++;
           }
         } catch (err) {
           _didIteratorError2 = true;
@@ -704,7 +715,8 @@ var dbToCloud = (function (exports) {
           for (var _iterator3 = changes[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
             const change = _step3.value;
             idx.set(change._id, change);
-          }
+          } // drop outdated change
+
         } catch (err) {
           _didIteratorError3 = true;
           _iteratorError3 = err;
@@ -726,11 +738,8 @@ var dbToCloud = (function (exports) {
         var _iteratorError4 = undefined;
 
         try {
-          for (var _iterator4 = idx.entries()[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
-            const _step4$value = _slicedToArray(_step4.value, 2),
-                  id = _step4$value[0],
-                  change = _step4$value[1];
-
+          for (var _iterator4 = idx.values()[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
+            const change = _step4.value;
             // FIXME: is it safe to assume that the local doc is newer when
             // remoteRev is undefined?
             const remoteRev = revisionCache.get(change._id);
@@ -739,22 +748,9 @@ var dbToCloud = (function (exports) {
               continue;
             }
 
-            onProgress('syncPush', change);
-
-            if (change.action === "delete") {
-              yield _drive2.delete("docs/".concat(id, ".json"));
-            } else if (change.action === "put") {
-              const doc = yield onGet(id, change._rev);
-              yield _drive2.put("docs/".concat(id, ".json"), {
-                doc,
-                _rev: change._rev
-              });
-            }
-
-            revisionCache.set(id, change._rev);
             newChanges.push(change);
           } // FIXME: there should be no need to push data when !newChanges.length
-          // push changes
+          // start pushing
 
         } catch (err) {
           _didIteratorError4 = true;
@@ -770,6 +766,35 @@ var dbToCloud = (function (exports) {
             }
           }
         }
+
+        let loaded = 0;
+
+        for (var _i = 0, _newChanges = newChanges; _i < _newChanges.length; _i++) {
+          const change = _newChanges[_i];
+
+          if (onProgress) {
+            onProgress({
+              phase: 'push',
+              loaded,
+              total: newChanges.length,
+              change
+            });
+          }
+
+          if (change.action === "delete") {
+            yield _drive2.delete("docs/".concat(change._id, ".json"));
+          } else if (change.action === "put") {
+            const doc = yield onGet(change._id, change._rev);
+            yield _drive2.put("docs/".concat(change._id, ".json"), {
+              doc,
+              _rev: change._rev
+            });
+          }
+
+          revisionCache.set(change._id, change._rev);
+          loaded++;
+        } // push changes
+
 
         let lastChanges;
         let index; // meta is already pulled in syncPull
@@ -833,7 +858,11 @@ var dbToCloud = (function (exports) {
         yield lock.write(
         /*#__PURE__*/
         _asyncToGenerator(function* () {
-          onProgress('syncStart');
+          if (onProgress) {
+            onProgress({
+              phase: 'start'
+            });
+          }
 
           try {
             if (!state.queue.length && peek && meta) {
@@ -846,7 +875,11 @@ var dbToCloud = (function (exports) {
 
             yield sync();
           } finally {
-            onProgress('syncEnd');
+            if (onProgress) {
+              onProgress({
+                phase: 'end'
+              });
+            }
           }
         }));
       });
