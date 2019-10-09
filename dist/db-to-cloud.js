@@ -513,6 +513,10 @@ var dbToCloud = (function (exports) {
 
     function _start() {
       _start = _asyncToGenerator(function* () {
+        if (state && state.enabled) {
+          return;
+        }
+
         if (!_drive2) {
           throw new Error("cloud drive is undefined");
         }
@@ -543,6 +547,10 @@ var dbToCloud = (function (exports) {
 
     function _stop() {
       _stop = _asyncToGenerator(function* () {
+        if (!state || !state.enabled) {
+          return;
+        }
+
         state.enabled = false;
         yield lock.write(
         /*#__PURE__*/
@@ -851,7 +859,7 @@ var dbToCloud = (function (exports) {
 
     function _syncNow() {
       _syncNow = _asyncToGenerator(function* (peek = true) {
-        if (!state.enabled) {
+        if (!state || !state.enabled) {
           throw new Error("Cannot sync now, the sync is not enabled");
         }
 
@@ -1893,3 +1901,4 @@ var dbToCloud = (function (exports) {
   return exports;
 
 }({}));
+//# sourceMappingURL=db-to-cloud.js.map
