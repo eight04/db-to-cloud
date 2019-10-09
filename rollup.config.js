@@ -12,6 +12,7 @@ function config({output, plugins = []}) {
       // file: "dist/db-to-cloud.js",
       format: "iife",
       name: "dbToCloud",
+      sourcemap: true,
       ...output
     },
     plugins: [
