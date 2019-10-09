@@ -461,6 +461,10 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
+* 0.4.1 (Oct 9, 2019)
+
+  - Fix: ignore `start()`/`stop()` if already started/stopped.
+
 * 0.4.0 (Oct 4, 2019)
 
   - **Breaking: the signature of `onProgress` is changed.** It now receives an event object.
