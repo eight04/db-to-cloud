@@ -277,6 +277,28 @@ Sync now. Pull changes from the cloud and push local changes to the cloud.
 
 When `peekChanges` is `true`, the controller calls `cloud.peekChanges` to check if changes are available.
 
+### sync.isInit
+
+```js
+sync.isInit() => Boolean
+```
+
+Check if the sync is enabled. Use this flag to determine whether the initialization failed or the first sync failed:
+
+```js
+async function start() {
+  try {
+    await sync.start();
+  } catch (err) {
+    if (sync.isInit()) {
+      // the first sync failed. Connection error?
+    } else {
+      // initialization failed
+    }
+  }
+}
+```
+
 Drives
 -------
 
@@ -460,6 +482,10 @@ If your adapter uses an access token, make sure to throw a proper authentication
 
 Changelog
 ---------
+
+* 0.4.2 (Oct 12, 2019)
+
+  - Add: `sync.isInit`.
 
 * 0.4.1 (Oct 9, 2019)
 
