@@ -219,7 +219,12 @@ async function suite(prepare) {
     }
   };
   const {sync, options, drive} = prepare(data);
+  
+  assert(!sync.isInit());
+  
   await sync.start();
+  
+  assert(sync.isInit());
 
   logger.log("started, data should be written to drive");
 
@@ -375,6 +380,7 @@ describe("functional", () => {
     this.timeout(20 * 1000);
     for (const ctrl of instances) {
       await ctrl.stop();
+      assert(!ctrl.isInit());
     }
     instances.length = 0;
   });
