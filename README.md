@@ -11,7 +11,9 @@ To use this library, add following properties to the document:
 * A unique ID. `Number` or `String`. Two objects are treated as the same document when they have the same ID. This is usually a UUID. The ID must be a valid filename.
 * A revision tag. `Number` or `String`. If two objects have the same ID but different revision, the cloud needs to decide which should be kept and saved. For a simple use case, you can use a timestamp as the revision tag and always keep the latest object.
 
-> In CouchDB, these properties are `_id` and `_rev`. We also uses these names in the code example.
+In following examples, we use `_id` and `_rev` as property names.
+
+> **Note:** In PouchDB, `_rev` property is a random string which shouldn't be used as the revision tag in db-to-cloud. You may want to create a `_updated` property storing the timestamp of the last update.
 
 Installation
 ------------
@@ -157,8 +159,8 @@ This module exports following properties:
 ```js
 dbToCloud({
   onGet: async (id, rev) => Document,
-  onPut: async (document) => void,
   onDelete: async (id, rev) => void,
+  onPut: async (document) => void,
   
   onFirstSync: async () => void,
   
@@ -176,9 +178,11 @@ dbToCloud({
 
 Create a sync controller. [Usage example](#setup).
 
-`onGet` accept a revision tag. However, you can ignore it and return/delete the latest one since it isn't useful to store outdated document in the cloud.
+`onGet` accepts a revision tag. However, you can ignore it and return/delete the latest one since it isn't useful to store outdated document in the cloud.
 
-`onDelete` also accept a revision tag. You can use it to decide if the deletion take place or should be ignored.
+`onDelete` also accept a revision tag. You can use it to decide if the deletion takes place or should be ignored.
+
+`onPut` is used to insert/update the document to the local database. You should check if the revision tag is compatible first.
 
 `onFirstSync` is called on the first sync. You can push all local documents to the cloud in this hook.
 
