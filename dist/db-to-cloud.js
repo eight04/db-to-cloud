@@ -1483,10 +1483,19 @@ var dbToCloud = (function (exports) {
           file = ":/".concat(file, ":");
         }
 
-        const result = yield query({
+        let result = yield query({
           path: "".concat(file, "/children?select=name")
         });
-        return result.value.map(i => i.name);
+        let files = result.value.map(i => i.name);
+
+        while (result["@odata.nextLink"]) {
+          result = yield request({
+            path: result["@odata.nextLink"]
+          });
+          files = files.concat(result.value.map(i => i.name));
+        }
+
+        return files;
       });
       return _list.apply(this, arguments);
     }
