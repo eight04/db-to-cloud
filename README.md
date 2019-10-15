@@ -487,6 +487,10 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
+* 0.4.3 (Oct 15, 2019)
+
+  - Fix: cannot list all docs in onedrive.
+
 * 0.4.2 (Oct 12, 2019)
 
   - Add: `sync.isInit`.
