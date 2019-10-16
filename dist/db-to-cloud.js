@@ -509,11 +509,9 @@ var dbToCloud = (function (exports) {
     }
 
     function start() {
-      return _start.apply(this, arguments);
-    }
-
-    function _start() {
-      _start = _asyncToGenerator(function* () {
+      return lock.write(
+      /*#__PURE__*/
+      _asyncToGenerator(function* () {
         if (state && state.enabled) {
           return;
         }
@@ -537,33 +535,28 @@ var dbToCloud = (function (exports) {
           yield onFirstSync();
         }
 
-        yield syncNow();
-      });
-      return _start.apply(this, arguments);
+        yield _syncNow();
+      }));
     }
 
     function stop() {
-      return _stop.apply(this, arguments);
-    }
-
-    function _stop() {
-      _stop = _asyncToGenerator(function* () {
+      return lock.write(
+      /*#__PURE__*/
+      _asyncToGenerator(function* () {
         if (!state || !state.enabled) {
           return;
         }
 
         state = meta = null;
-        yield lock.write(
-        /*#__PURE__*/
-        _asyncToGenerator(function* () {
-          if (_drive2.uninit) {
-            yield _drive2.uninit();
-          }
+        changeCache.clear();
+        revisionCache.clear();
 
-          yield saveState();
-        }));
-      });
-      return _stop.apply(this, arguments);
+        if (_drive2.uninit) {
+          yield _drive2.uninit();
+        }
+
+        yield saveState();
+      }));
     }
 
     function syncPull() {
@@ -654,10 +647,10 @@ var dbToCloud = (function (exports) {
               yield onDelete(id, change._rev);
             } else if (change.action === "put") {
               try {
-                var _ref5 = yield _drive2.get("docs/".concat(id, ".json"));
+                var _ref7 = yield _drive2.get("docs/".concat(id, ".json"));
 
-                doc = _ref5.doc;
-                _rev = _ref5._rev;
+                doc = _ref7.doc;
+                _rev = _ref7._rev;
               } catch (err) {
                 if (err.code === "ENOENT" || err.code === 404) {
                   onWarn("Cannot find ".concat(id, ". Is it deleted without updating the history?"));
@@ -854,45 +847,49 @@ var dbToCloud = (function (exports) {
       return _sync.apply(this, arguments);
     }
 
-    function syncNow() {
-      return _syncNow.apply(this, arguments);
-    }
-
-    function _syncNow() {
-      _syncNow = _asyncToGenerator(function* (peek = true) {
+    function syncNow(peek) {
+      return lock.write(
+      /*#__PURE__*/
+      _asyncToGenerator(function* () {
         if (!state || !state.enabled) {
           throw new Error("Cannot sync now, the sync is not enabled");
         }
 
-        yield lock.write(
-        /*#__PURE__*/
-        _asyncToGenerator(function* () {
+        yield _syncNow(peek);
+      }));
+    }
+
+    function _syncNow() {
+      return _syncNow2.apply(this, arguments);
+    }
+
+    function _syncNow2() {
+      _syncNow2 = _asyncToGenerator(function* (peek = true) {
+        if (onProgress) {
+          onProgress({
+            phase: 'start'
+          });
+        }
+
+        try {
+          if (!state.queue.length && peek && meta) {
+            const changed = yield _drive2.peekChanges(meta);
+
+            if (!changed) {
+              return;
+            }
+          }
+
+          yield sync();
+        } finally {
           if (onProgress) {
             onProgress({
-              phase: 'start'
+              phase: 'end'
             });
           }
-
-          try {
-            if (!state.queue.length && peek && meta) {
-              const changed = yield _drive2.peekChanges(meta);
-
-              if (!changed) {
-                return;
-              }
-            }
-
-            yield sync();
-          } finally {
-            if (onProgress) {
-              onProgress({
-                phase: 'end'
-              });
-            }
-          }
-        }));
+        }
       });
-      return _syncNow.apply(this, arguments);
+      return _syncNow2.apply(this, arguments);
     }
 
     function put(_id, _rev) {
