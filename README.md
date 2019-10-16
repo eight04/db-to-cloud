@@ -487,6 +487,10 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
+* 0.4.5 (Oct 17, 2019)
+
+  - Fix: clear change cache and revision cache when stopped.
+
 * 0.4.4 (Oct 17, 2019)
 
   - Fix: local state is not cleared when stopped.
