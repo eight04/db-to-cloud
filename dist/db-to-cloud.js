@@ -552,7 +552,7 @@ var dbToCloud = (function (exports) {
           return;
         }
 
-        state.enabled = false;
+        state = meta = null;
         yield lock.write(
         /*#__PURE__*/
         _asyncToGenerator(function* () {
