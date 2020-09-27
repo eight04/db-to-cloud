@@ -228,32 +228,35 @@ sync.use(cloud: CloudAdapter) => void
 
 Use a cloud adapter.
 
-### sync.start
+### sync.init
 
 ```js
-async sync.start() => void
+async sync.init() => void
 ```
 
-Start syncing.
+Initialize the sync controller:
+
+1. Initialize the cloud adapter.
+2. Read the state from the storage into memory.
 
 Without calling this function, sending items to `sync.put`, `sync.delete`, etc, has no effect. Documents are added to the queue only if this function is called.
 
-Calling this function also triggers the initial sync.
+This function does nothing if the controller is already initialized.
 
-### sync.stop
+### sync.uninit
 
 ```js
-async sync.stop() => void
+async sync.uninit() => void
 ```
 
-Stop syncing.
-
-This method do following stuff:
+Uninitialize the sync controller:
 
 1. Stop collecting local changes.
 2. Wait until all running sync task complete.
 3. Uninitialize the cloud.
 4. Save the current state.
+
+This function does nothing if the controller is not initialized.
 
 ### sync.put
 
