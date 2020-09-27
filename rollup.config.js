@@ -1,15 +1,13 @@
-// import analyzer from "rollup-plugin-analyzer";
-import resolve from "rollup-plugin-node-resolve";
+import resolve from "@rollup/plugin-node-resolve";
 import cjs from "rollup-plugin-cjs-es";
-import alias from "rollup-plugin-alias";
-import babel from "rollup-plugin-babel";
+import alias from "@rollup/plugin-alias";
+import babel from "@rollup/plugin-babel";
 import {terser} from "rollup-plugin-terser";
 
 function config({output, plugins = []}) {
   return {
     input: "index.js",
     output: {
-      // file: "dist/db-to-cloud.js",
       format: "iife",
       name: "dbToCloud",
       sourcemap: true,
@@ -26,10 +24,10 @@ function config({output, plugins = []}) {
         browser: true
       }),
       cjs({nested: true}),
-      babel(),
+      babel({
+        babelHelpers: "bundled"
+      }),
       ...plugins
-      // terser(),
-      // analyzer()
     ]
   };
 }

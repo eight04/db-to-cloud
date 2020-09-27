@@ -71,13 +71,13 @@ var dbToCloud = (function (exports) {
       var source = arguments[i] != null ? arguments[i] : {};
 
       if (i % 2) {
-        ownKeys(source, true).forEach(function (key) {
+        ownKeys(Object(source), true).forEach(function (key) {
           _defineProperty(target, key, source[key]);
         });
       } else if (Object.getOwnPropertyDescriptors) {
         Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
       } else {
-        ownKeys(source).forEach(function (key) {
+        ownKeys(Object(source)).forEach(function (key) {
           Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
         });
       }
@@ -123,7 +123,7 @@ var dbToCloud = (function (exports) {
   }
 
   function _slicedToArray(arr, i) {
-    return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
+    return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest();
   }
 
   function _arrayWithHoles(arr) {
@@ -131,10 +131,7 @@ var dbToCloud = (function (exports) {
   }
 
   function _iterableToArrayLimit(arr, i) {
-    if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === "[object Arguments]")) {
-      return;
-    }
-
+    if (typeof Symbol === "undefined" || !(Symbol.iterator in Object(arr))) return;
     var _arr = [];
     var _n = true;
     var _d = false;
@@ -160,8 +157,82 @@ var dbToCloud = (function (exports) {
     return _arr;
   }
 
+  function _unsupportedIterableToArray(o, minLen) {
+    if (!o) return;
+    if (typeof o === "string") return _arrayLikeToArray(o, minLen);
+    var n = Object.prototype.toString.call(o).slice(8, -1);
+    if (n === "Object" && o.constructor) n = o.constructor.name;
+    if (n === "Map" || n === "Set") return Array.from(o);
+    if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen);
+  }
+
+  function _arrayLikeToArray(arr, len) {
+    if (len == null || len > arr.length) len = arr.length;
+
+    for (var i = 0, arr2 = new Array(len); i < len; i++) arr2[i] = arr[i];
+
+    return arr2;
+  }
+
   function _nonIterableRest() {
-    throw new TypeError("Invalid attempt to destructure non-iterable instance");
+    throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
+  }
+
+  function _createForOfIteratorHelper(o, allowArrayLike) {
+    var it;
+
+    if (typeof Symbol === "undefined" || o[Symbol.iterator] == null) {
+      if (Array.isArray(o) || (it = _unsupportedIterableToArray(o)) || allowArrayLike && o && typeof o.length === "number") {
+        if (it) o = it;
+        var i = 0;
+
+        var F = function () {};
+
+        return {
+          s: F,
+          n: function () {
+            if (i >= o.length) return {
+              done: true
+            };
+            return {
+              done: false,
+              value: o[i++]
+            };
+          },
+          e: function (e) {
+            throw e;
+          },
+          f: F
+        };
+      }
+
+      throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
+    }
+
+    var normalCompletion = true,
+        didErr = false,
+        err;
+    return {
+      s: function () {
+        it = o[Symbol.iterator]();
+      },
+      n: function () {
+        var step = it.next();
+        normalCompletion = step.done;
+        return step;
+      },
+      e: function (e) {
+        didErr = true;
+        err = e;
+      },
+      f: function () {
+        try {
+          if (!normalCompletion && it.return != null) it.return();
+        } finally {
+          if (didErr) throw err;
+        }
+      }
+    };
   }
 
   function createLock({
@@ -342,11 +413,9 @@ var dbToCloud = (function (exports) {
   function buildDrive(_drive) {
     const drive = Object.create(_drive);
 
-    drive.get =
-    /*#__PURE__*/
-    function () {
+    drive.get = /*#__PURE__*/function () {
       var _ref = _asyncToGenerator(function* (path) {
-        return JSON.parse((yield _drive.get(path)));
+        return JSON.parse(yield _drive.get(path));
       });
 
       return function (_x) {
@@ -354,9 +423,7 @@ var dbToCloud = (function (exports) {
       };
     }();
 
-    drive.put =
-    /*#__PURE__*/
-    function () {
+    drive.put = /*#__PURE__*/function () {
       var _ref2 = _asyncToGenerator(function* (path, data) {
         return yield _drive.put(path, JSON.stringify(data));
       });
@@ -366,9 +433,7 @@ var dbToCloud = (function (exports) {
       };
     }();
 
-    drive.post =
-    /*#__PURE__*/
-    function () {
+    drive.post = /*#__PURE__*/function () {
       var _ref3 = _asyncToGenerator(function* (path, data) {
         return yield _drive.post(path, JSON.stringify(data));
       });
@@ -509,9 +574,7 @@ var dbToCloud = (function (exports) {
     }
 
     function start() {
-      return lock.write(
-      /*#__PURE__*/
-      _asyncToGenerator(function* () {
+      return lock.write( /*#__PURE__*/_asyncToGenerator(function* () {
         if (state && state.enabled) {
           return;
         }
@@ -540,9 +603,7 @@ var dbToCloud = (function (exports) {
     }
 
     function stop() {
-      return lock.write(
-      /*#__PURE__*/
-      _asyncToGenerator(function* () {
+      return lock.write( /*#__PURE__*/_asyncToGenerator(function* () {
         if (!state || !state.enabled) {
           return;
         }
@@ -597,37 +658,28 @@ var dbToCloud = (function (exports) {
 
 
         const idx = new Map();
-        var _iteratorNormalCompletion = true;
-        var _didIteratorError = false;
-        var _iteratorError = undefined;
+
+        var _iterator = _createForOfIteratorHelper(changes),
+            _step;
 
         try {
-          for (var _iterator = changes[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+          for (_iterator.s(); !(_step = _iterator.n()).done;) {
             const change = _step.value;
             idx.set(change._id, change);
           }
         } catch (err) {
-          _didIteratorError = true;
-          _iteratorError = err;
+          _iterator.e(err);
         } finally {
-          try {
-            if (!_iteratorNormalCompletion && _iterator.return != null) {
-              _iterator.return();
-            }
-          } finally {
-            if (_didIteratorError) {
-              throw _iteratorError;
-            }
-          }
+          _iterator.f();
         }
 
         let loaded = 0;
-        var _iteratorNormalCompletion2 = true;
-        var _didIteratorError2 = false;
-        var _iteratorError2 = undefined;
+
+        var _iterator2 = _createForOfIteratorHelper(idx),
+            _step2;
 
         try {
-          for (var _iterator2 = idx[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+          for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
             const _step2$value = _slicedToArray(_step2.value, 2),
                   id = _step2$value[0],
                   change = _step2$value[1];
@@ -647,10 +699,10 @@ var dbToCloud = (function (exports) {
               yield onDelete(id, change._rev);
             } else if (change.action === "put") {
               try {
-                var _ref7 = yield _drive2.get("docs/".concat(id, ".json"));
+                var _yield$_drive2$get = yield _drive2.get("docs/".concat(id, ".json"));
 
-                doc = _ref7.doc;
-                _rev = _ref7._rev;
+                doc = _yield$_drive2$get.doc;
+                _rev = _yield$_drive2$get._rev;
               } catch (err) {
                 if (err.code === "ENOENT" || err.code === 404) {
                   onWarn("Cannot find ".concat(id, ". Is it deleted without updating the history?"));
@@ -674,18 +726,9 @@ var dbToCloud = (function (exports) {
             loaded++;
           }
         } catch (err) {
-          _didIteratorError2 = true;
-          _iteratorError2 = err;
+          _iterator2.e(err);
         } finally {
-          try {
-            if (!_iteratorNormalCompletion2 && _iterator2.return != null) {
-              _iterator2.return();
-            }
-          } finally {
-            if (_didIteratorError2) {
-              throw _iteratorError2;
-            }
-          }
+          _iterator2.f();
         }
 
         state.lastChange = meta.lastChange;
@@ -709,38 +752,29 @@ var dbToCloud = (function (exports) {
         const changes = state.queue.slice(); // merge changes
 
         const idx = new Map();
-        var _iteratorNormalCompletion3 = true;
-        var _didIteratorError3 = false;
-        var _iteratorError3 = undefined;
+
+        var _iterator3 = _createForOfIteratorHelper(changes),
+            _step3;
 
         try {
-          for (var _iterator3 = changes[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+          for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
             const change = _step3.value;
             idx.set(change._id, change);
           } // drop outdated change
 
         } catch (err) {
-          _didIteratorError3 = true;
-          _iteratorError3 = err;
+          _iterator3.e(err);
         } finally {
-          try {
-            if (!_iteratorNormalCompletion3 && _iterator3.return != null) {
-              _iterator3.return();
-            }
-          } finally {
-            if (_didIteratorError3) {
-              throw _iteratorError3;
-            }
-          }
+          _iterator3.f();
         }
 
         const newChanges = [];
-        var _iteratorNormalCompletion4 = true;
-        var _didIteratorError4 = false;
-        var _iteratorError4 = undefined;
+
+        var _iterator4 = _createForOfIteratorHelper(idx.values()),
+            _step4;
 
         try {
-          for (var _iterator4 = idx.values()[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
+          for (_iterator4.s(); !(_step4 = _iterator4.n()).done;) {
             const change = _step4.value;
             // FIXME: is it safe to assume that the local doc is newer when
             // remoteRev is undefined?
@@ -755,18 +789,9 @@ var dbToCloud = (function (exports) {
           // start pushing
 
         } catch (err) {
-          _didIteratorError4 = true;
-          _iteratorError4 = err;
+          _iterator4.e(err);
         } finally {
-          try {
-            if (!_iteratorNormalCompletion4 && _iterator4.return != null) {
-              _iterator4.return();
-            }
-          } finally {
-            if (_didIteratorError4) {
-              throw _iteratorError4;
-            }
-          }
+          _iterator4.f();
         }
 
         let loaded = 0;
@@ -848,9 +873,7 @@ var dbToCloud = (function (exports) {
     }
 
     function syncNow(peek) {
-      return lock.write(
-      /*#__PURE__*/
-      _asyncToGenerator(function* () {
+      return lock.write( /*#__PURE__*/_asyncToGenerator(function* () {
         if (!state || !state.enabled) {
           throw new Error("Cannot sync now, the sync is not enabled");
         }
@@ -970,9 +993,7 @@ var dbToCloud = (function (exports) {
   }) {
     const lock = createLock();
     return args => {
-      return lock.write(
-      /*#__PURE__*/
-      function () {
+      return lock.write( /*#__PURE__*/function () {
         var _ref = _asyncToGenerator(function* (done) {
           try {
             return yield doRequest(args);
@@ -1004,7 +1025,7 @@ var dbToCloud = (function (exports) {
             args = _objectWithoutProperties(_ref2, ["path", "contentType", "headers", "format"]);
 
         const headers = {
-          "Authorization": "Bearer ".concat((yield getAccessToken()))
+          "Authorization": "Bearer ".concat(yield getAccessToken())
         };
 
         if (contentType) {
@@ -1103,29 +1124,20 @@ var dbToCloud = (function (exports) {
           path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file)
         });
         const names = [];
-        var _iteratorNormalCompletion = true;
-        var _didIteratorError = false;
-        var _iteratorError = undefined;
+
+        var _iterator = _createForOfIteratorHelper(result),
+            _step;
 
         try {
-          for (var _iterator = result[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+          for (_iterator.s(); !(_step = _iterator.n()).done;) {
             const item = _step.value;
             names.push(item.name);
             shaCache.set(item.path, item.sha);
           }
         } catch (err) {
-          _didIteratorError = true;
-          _iteratorError = err;
+          _iterator.e(err);
         } finally {
-          try {
-            if (!_iteratorNormalCompletion && _iterator.return != null) {
-              _iterator.return();
-            }
-          } finally {
-            if (_didIteratorError) {
-              throw _iteratorError;
-            }
-          }
+          _iterator.f();
         }
 
         return names;
@@ -1279,28 +1291,19 @@ var dbToCloud = (function (exports) {
             path: "/".concat(file)
           }
         });
-        var _iteratorNormalCompletion = true;
-        var _didIteratorError = false;
-        var _iteratorError = undefined;
+
+        var _iterator = _createForOfIteratorHelper(result.entries),
+            _step;
 
         try {
-          for (var _iterator = result.entries[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+          for (_iterator.s(); !(_step = _iterator.n()).done;) {
             const entry = _step.value;
             names.push(entry.name);
           }
         } catch (err) {
-          _didIteratorError = true;
-          _iteratorError = err;
+          _iterator.e(err);
         } finally {
-          try {
-            if (!_iteratorNormalCompletion && _iterator.return != null) {
-              _iterator.return();
-            }
-          } finally {
-            if (_didIteratorError) {
-              throw _iteratorError;
-            }
-          }
+          _iterator.f();
         }
 
         if (!result.has_more) {
@@ -1314,28 +1317,19 @@ var dbToCloud = (function (exports) {
               cursor: result.cursor
             }
           });
-          var _iteratorNormalCompletion2 = true;
-          var _didIteratorError2 = false;
-          var _iteratorError2 = undefined;
+
+          var _iterator2 = _createForOfIteratorHelper(result.entries),
+              _step2;
 
           try {
-            for (var _iterator2 = result.entries[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+            for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
               const entry = _step2.value;
               names.push(entry.name);
             }
           } catch (err) {
-            _didIteratorError2 = true;
-            _iteratorError2 = err;
+            _iterator2.e(err);
           } finally {
-            try {
-              if (!_iteratorNormalCompletion2 && _iterator2.return != null) {
-                _iterator2.return();
-              }
-            } finally {
-              if (_didIteratorError2) {
-                throw _iteratorError2;
-              }
-            }
+            _iterator2.f();
           }
         }
 
@@ -1625,10 +1619,10 @@ var dbToCloud = (function (exports) {
       _acquireLock = _asyncToGenerator(function* (expire) {
         const lock = fileMetaCache.get("lock.json");
 
-        const _ref = yield queryPatch(lock.id, JSON.stringify({
+        const _yield$queryPatch = yield queryPatch(lock.id, JSON.stringify({
           expire: Date.now() + expire * 60 * 1000
         })),
-              headRevisionId = _ref.headRevisionId;
+              headRevisionId = _yield$queryPatch.headRevisionId;
 
         const result = yield request({
           path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions?fields=revisions(id)")
@@ -1643,9 +1637,9 @@ var dbToCloud = (function (exports) {
             return;
           }
 
-          const rev = JSON.parse((yield request({
+          const rev = JSON.parse(yield request({
             path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions/").concat(revId, "?alt=media")
-          })));
+          }));
 
           if (rev.expire > Date.now()) {
             // failed, delete the lock
@@ -1726,28 +1720,18 @@ var dbToCloud = (function (exports) {
         }
 
         yield queryList(query, result => {
-          var _iteratorNormalCompletion = true;
-          var _didIteratorError = false;
-          var _iteratorError = undefined;
+          var _iterator = _createForOfIteratorHelper(result.files),
+              _step;
 
           try {
-            for (var _iterator = result.files[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            for (_iterator.s(); !(_step = _iterator.n()).done;) {
               const file = _step.value;
               fileMetaCache.set(file.name, file);
             }
           } catch (err) {
-            _didIteratorError = true;
-            _iteratorError = err;
+            _iterator.e(err);
           } finally {
-            try {
-              if (!_iteratorNormalCompletion && _iterator.return != null) {
-                _iterator.return();
-              }
-            } finally {
-              if (_didIteratorError) {
-                throw _iteratorError;
-              }
-            }
+            _iterator.f();
           }
         });
       });
@@ -1892,9 +1876,8 @@ var dbToCloud = (function (exports) {
     }
   }
 
-
-
   var index = /*#__PURE__*/Object.freeze({
+    __proto__: null,
     fsDrive: empty,
     github: createDrive,
     dropbox: createDrive$1,
