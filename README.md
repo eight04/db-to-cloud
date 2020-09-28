@@ -494,6 +494,7 @@ Changelog
 
   - **Breaking: drop `sync.start`, `sync.stop`. Add `sync.init`, `sync.uninit`.**
   - Change: `onFirstSync` will be called from `sync.syncNow` instead of `sync.start`. Which means `onFirstSync` error will interrupt the sync process correctly.
+  - Change: add `mute` param to dropbox uploads.
 
 * 0.4.5 (Oct 17, 2019)
 
