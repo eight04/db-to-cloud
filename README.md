@@ -228,32 +228,35 @@ sync.use(cloud: CloudAdapter) => void
 
 Use a cloud adapter.
 
-### sync.start
+### sync.init
 
 ```js
-async sync.start() => void
+async sync.init() => void
 ```
 
-Start syncing.
+Initialize the sync controller:
+
+1. Initialize the cloud adapter.
+2. Read the state from the storage into memory.
 
 Without calling this function, sending items to `sync.put`, `sync.delete`, etc, has no effect. Documents are added to the queue only if this function is called.
 
-Calling this function also triggers the initial sync.
+This function does nothing if the controller is already initialized.
 
-### sync.stop
+### sync.uninit
 
 ```js
-async sync.stop() => void
+async sync.uninit() => void
 ```
 
-Stop syncing.
-
-This method do following stuff:
+Uninitialize the sync controller:
 
 1. Stop collecting local changes.
 2. Wait until all running sync task complete.
 3. Uninitialize the cloud.
 4. Save the current state.
+
+This function does nothing if the controller is not initialized.
 
 ### sync.put
 
@@ -486,6 +489,11 @@ If your adapter uses an access token, make sure to throw a proper authentication
 
 Changelog
 ---------
+
+* 0.5.0 (next)
+
+  - **Breaking: drop `sync.start`, `sync.stop`. Add `sync.init`, `sync.uninit`.**
+  - Change: `onFirstSync` will be called from `sync.syncNow` instead of `sync.start`. Which means `onFirstSync` error will interrupt the sync process correctly.
 
 * 0.4.5 (Oct 17, 2019)
 

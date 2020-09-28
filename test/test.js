@@ -190,21 +190,6 @@ const ADAPTERS = [
   }
 ];
 
-// (async () => {
-  // const adapter = ADAPTERS.slice(-1)[0];
-  // await adapter.before();
-  // const drive = await adapter.get();
-  // await drive.init();
-  // await drive.acquireLock(60);
-  // await drive.releaseLock();
-// })()
-  // .catch(err => {
-    // console.log(err);
-    // console.log(err.origin.errors);
-  // });
-// getGoogleAccessToken().then(console.log, console.error);
-// return;
-
 async function suite(prepare) {
   const data = {
     1: {
@@ -222,19 +207,31 @@ async function suite(prepare) {
   
   assert(!sync.isInit());
   
-  await sync.start();
+  await sync.init();
   
   assert(sync.isInit());
 
-  logger.log("started, data should be written to drive");
+  logger.log("started, try to modify db before the first sync");
+  
+  sync.delete(3, 1);
+  sync.put(1, 1);
+
+  await sync.syncNow();
+
+  logger.log("data should be written to drive");
 
   {
     const meta = await sync.drive().getMeta();
-    assert.equal(meta.lastChange, 2);
+    assert.equal(meta.lastChange, 3);
     const {doc} = JSON.parse(await drive.get("docs/2.json"));
     assert.deepStrictEqual(doc, data[2]);
     const changes = JSON.parse(await drive.get("changes/0.json"));
     assert.deepStrictEqual(changes, [
+      {
+        _id: 3,
+        _rev: 1,
+        action: "delete"
+      },
       {
         _id: 1,
         _rev: 1,
@@ -253,8 +250,18 @@ async function suite(prepare) {
       },
       {
         phase: 'push',
-        total: 2,
+        total: 3,
         loaded: 0,
+        change: {
+          _id: 3,
+          _rev: 1,
+          action: "delete"
+        }
+      },
+      {
+        phase: 'push',
+        total: 3,
+        loaded: 1,
         change: {
           _id: 1,
           _rev: 1,
@@ -263,8 +270,8 @@ async function suite(prepare) {
       },
       {
         phase: 'push',
-        total: 2,
-        loaded: 1,
+        total: 3,
+        loaded: 2,
         change: {
           _id: 2,
           _rev: 1,
@@ -285,7 +292,8 @@ async function suite(prepare) {
   logger.log("start and sync with the second instance");
 
   const {sync: sync2, data: data2, options: options2} = prepare();
-  await sync2.start();
+  await sync2.init();
+  await sync2.syncNow();
   assert.deepStrictEqual(data2, data);
   {
     const args = options2.onProgress.getCalls().map(c => c.args[0]);
@@ -379,7 +387,7 @@ describe("functional", () => {
   afterEach(async function () {
     this.timeout(20 * 1000);
     for (const ctrl of instances) {
-      await ctrl.stop();
+      await ctrl.uninit();
       assert(!ctrl.isInit());
     }
     instances.length = 0;
