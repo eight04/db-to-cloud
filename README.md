@@ -490,7 +490,7 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
-* 0.5.0 (next)
+* 0.5.0 (Sep 28, 2020)
 
   - **Breaking: drop `sync.start`, `sync.stop`. Add `sync.init`, `sync.uninit`.**
   - Change: `onFirstSync` will be called from `sync.syncNow` instead of `sync.start`. Which means `onFirstSync` error will interrupt the sync process correctly.
