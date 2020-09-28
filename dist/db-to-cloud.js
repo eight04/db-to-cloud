@@ -560,8 +560,8 @@ var dbToCloud = (function (exports) {
     const lock = createLock();
     return {
       use,
-      start,
-      stop,
+      init,
+      uninit,
       put,
       delete: delete_,
       syncNow,
@@ -573,7 +573,7 @@ var dbToCloud = (function (exports) {
       _drive2 = buildDrive(newDrive);
     }
 
-    function start() {
+    function init() {
       return lock.write( /*#__PURE__*/_asyncToGenerator(function* () {
         if (state && state.enabled) {
           return;
@@ -593,16 +593,10 @@ var dbToCloud = (function (exports) {
         if (!state.queue) {
           state.queue = [];
         }
-
-        if (state.lastChange == null) {
-          yield onFirstSync();
-        }
-
-        yield _syncNow();
       }));
     }
 
-    function stop() {
+    function uninit() {
       return lock.write( /*#__PURE__*/_asyncToGenerator(function* () {
         if (!state || !state.enabled) {
           return;
@@ -876,6 +870,10 @@ var dbToCloud = (function (exports) {
       return lock.write( /*#__PURE__*/_asyncToGenerator(function* () {
         if (!state || !state.enabled) {
           throw new Error("Cannot sync now, the sync is not enabled");
+        }
+
+        if (state.lastChange == null) {
+          yield onFirstSync();
         }
 
         yield _syncNow(peek);
@@ -1379,7 +1377,8 @@ var dbToCloud = (function (exports) {
         const params = {
           path: "/".concat(file),
           mode,
-          autorename: false
+          autorename: false,
+          mute: true
         };
         yield request({
           path: "https://content.dropboxapi.com/2/files/upload?".concat(stringifyParams(params)),
