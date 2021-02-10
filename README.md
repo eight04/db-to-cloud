@@ -93,11 +93,12 @@ const cloud = google({
 });
 
 sync.use(cloud);
+await sync.init();
 
 try {
-  await sync.start();
+  await sync.syncNow();
 } catch (err) {
-  if (err.code === 401) {
+  if (err.name === "RequestError" && err.code === 401) {
     // handle login error, revoke the token
     // ...
   }
@@ -129,7 +130,7 @@ sync.delete(_id, _rev);
 ```js
 clearInterval(syncTimer);
 
-await sync.stop();
+await sync.uninit();
 
 const newDrive = github({
   owner: "eight04",
@@ -141,7 +142,7 @@ const newDrive = github({
 });
 sync.use(newDrive);
 
-await sync.start();
+await sync.init();
 
 syncTimer = setInterval(sync.syncNow, 30 * 60 * 1000);
 ```
@@ -234,10 +235,9 @@ Use a cloud adapter.
 async sync.init() => void
 ```
 
-Initialize the sync controller:
+Initialize the sync controller and read the state from the storage into memory.
 
-1. Initialize the cloud adapter.
-2. Read the state from the storage into memory.
+`sync.use` should be called before this method otherwise it throws a `drive is undefined` error.
 
 Without calling this function, sending items to `sync.put`, `sync.delete`, etc, has no effect. Documents are added to the queue only if this function is called.
 
@@ -280,7 +280,7 @@ Add a "delete action" to the history queue.
 async sync.syncNow(peekChanges: Boolean = true) => void
 ```
 
-Sync now. Pull changes from the cloud and push local changes to the cloud.
+Sync now. Pull remote changes from the cloud and push local changes to the cloud.
 
 When `peekChanges` is `true`, the controller calls `cloud.peekChanges` to check if changes are available.
 
@@ -290,26 +290,13 @@ When `peekChanges` is `true`, the controller calls `cloud.peekChanges` to check 
 sync.isInit() => Boolean
 ```
 
-Check if the sync is enabled. Use this flag to determine whether the initialization failed or the first sync failed:
+Check if the controller has been initialized.
 
-```js
-async function start() {
-  try {
-    await sync.start();
-  } catch (err) {
-    if (sync.isInit()) {
-      // the first sync failed. Connection error?
-    } else {
-      // initialization failed
-    }
-  }
-}
-```
 
 Drives
 -------
 
-The library includes 5 cloud drive adapters.
+The library includes five cloud drive adapters.
 
 Various adapters require browser builtins (e.g. `fetch`, `FormData`, `Blob`). You can check how do we implement such features in Node.js by looking into the test file.
 
@@ -395,7 +382,9 @@ To create a working adapter, create an object with following methods:
     async drive.uninit() => void
     ```
 
-    Optional. These hooks will be called when `sync.start`/`sync.stop`. If the adapter uses a large dependency, it should be dynamically loaded in `init`.
+    Optional. These hooks will be called when `sync.syncNow`/`sync.uninit`. If the adapter uses a large dependency, it should be dynamically loaded in `init`.
+    
+    Note that `.init` is not called until the sync actually happens.
 
 * *get*
 
@@ -489,6 +478,10 @@ If your adapter uses an access token, make sure to throw a proper authentication
 
 Changelog
 ---------
+
+* 0.6.0 (Feb 10, 2021)
+  
+  - Change: initialize cloud adapter in `syncNow` so adapter error will interrupt the sync process instead of crashing the entire app.
 
 * 0.5.0 (Sep 28, 2020)
 
