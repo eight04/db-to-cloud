@@ -443,6 +443,8 @@ var dbToCloud = (function (exports) {
       };
     }();
 
+    drive.isInit = false;
+
     if (!drive.acquireLock) {
       drive.acquireLock = acquireLock;
       drive.releaseLock = releaseLock;
@@ -583,10 +585,6 @@ var dbToCloud = (function (exports) {
           throw new Error("cloud drive is undefined");
         }
 
-        if (_drive2.init) {
-          yield _drive2.init();
-        }
-
         state = (yield getState(_drive2)) || {};
         state.enabled = true;
 
@@ -606,8 +604,9 @@ var dbToCloud = (function (exports) {
         changeCache.clear();
         revisionCache.clear();
 
-        if (_drive2.uninit) {
+        if (_drive2.uninit && _drive2.isInit) {
           yield _drive2.uninit();
+          _drive2.isInit = false;
         }
 
         yield saveState();
@@ -870,6 +869,11 @@ var dbToCloud = (function (exports) {
       return lock.write( /*#__PURE__*/_asyncToGenerator(function* () {
         if (!state || !state.enabled) {
           throw new Error("Cannot sync now, the sync is not enabled");
+        }
+
+        if (_drive2.init && !_drive2.isInit) {
+          yield _drive2.init();
+          _drive2.isInit = true;
         }
 
         if (state.lastChange == null) {
@@ -1886,6 +1890,8 @@ var dbToCloud = (function (exports) {
 
   exports.dbToCloud = dbToCloud;
   exports.drive = index;
+
+  Object.defineProperty(exports, '__esModule', { value: true });
 
   return exports;
 
