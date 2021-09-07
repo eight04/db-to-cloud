@@ -3,6 +3,6 @@
   "lib/drive/github.js",
   "lib/drive/google.js",
   "lib/drive/onedrive.js",
-  "node_modules/universal-base64/dist/browser.js",
+  "lib/drive/webdav.js",
   "shim/empty.js"
 ]

@@ -2,193 +2,20 @@
 require("dotenv").config();
 
 const assert = require("assert");
-const readline = require("readline");
 
-const {makeDir} = require("tempdir-yaml");
 const sinon = require("sinon");
 const logger = require("mocha-logger");
-const fetch = require("make-fetch-happen");
-const clipboardy = require("clipboardy");
-const FormData = require("form-data");
 const assertSet = require("assert-set");
 
-const {dbToCloud, drive: {fsDrive, github, dropbox, onedrive, google}} = require("..");
+const ADAPTERS = require("./adapter");
 
-class DummyBlob {
-  constructor(parts, options) {
-    this.parts = parts;
-    this.options = options;
-  }
-}
-
-const _append = FormData.prototype.append;
-FormData.prototype.append = function (name, blob) {
-  return _append.call(this, name, blob.parts.join(""), {contentType: blob.options.type});
-};
+const {dbToCloud} = require("..");
 
 function delay(time) {
   return new Promise(resolve => {
     setTimeout(resolve, time);
   });
 }
-
-function question(text) {
-  return new Promise(resolve => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-    rl.question(text, answer => {
-      rl.close();
-      resolve(answer);
-    });
-  });
-}
-
-async function getOneDriveAccessToken()  {
-  if (process.env.AZURE_ACCESS_TOKEN && Date.now() < Number(process.env.AZURE_ACCESS_TOKEN_EXPIRE)) {
-    return process.env.AZURE_ACCESS_TOKEN;
-  }
-  console.log("Open the URL to login:");
-  console.log(`https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${process.env.AZURE_APP_ID}&scope=Files.ReadWrite.AppFolder&response_type=code&redirect_uri=https://login.microsoftonline.com/common/oauth2/nativeclient`);
-  const url = await question("\nInput redirected URL:\n");
-  const code = new URL(url).searchParams.get("code");
-  const res = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
-    method: "POST",
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: `client_id=${process.env.AZURE_APP_ID}&redirect_uri=https://login.microsoftonline.com/common/oauth2/nativeclient&code=${code}&grant_type=authorization_code&scope=Files.ReadWrite.AppFolder`
-  });
-  const result = await res.json();
-  await clipboardy.write(`AZURE_ACCESS_TOKEN=${result.access_token}\nAZURE_ACCESS_TOKEN_EXPIRE=${Date.now() + result.expires_in * 1000}`);
-  console.log("\nENV are copied to clipboard");
-  return result.access_token;
-}
-
-async function getGoogleAccessToken() {
-  if (process.env.GOOGLE_ACCESS_TOKEN && Date.now() < Number(process.env.GOOGLE_ACCESS_TOKEN_EXPIRE)) {
-    return process.env.GOOGLE_ACCESS_TOKEN;
-  }
-  console.log("Open the URL to login:");
-  console.log(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_APP_ID}&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&scope=https://www.googleapis.com/auth/drive.appdata`);
-  const code = await question("\nInput the code:\n");
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: `client_id=${process.env.GOOGLE_APP_ID}&redirect_uri=urn:ietf:wg:oauth:2.0:oob&code=${code}&grant_type=authorization_code&client_secret=iPscd4omnupJFFIh-caMNV_J`
-  });
-  const result = await res.json();
-  await clipboardy.write(`GOOGLE_ACCESS_TOKEN=${result.access_token}\nGOOGLE_ACCESS_TOKEN_EXPIRE=${Date.now() + result.expires_in * 1000}`);
-  console.log("\nENV are copied to clipboard");
-  return result.access_token;
-}
-
-const ADAPTERS = [
-  {
-    name: "fs-drive",
-    valid: () => true,
-    async before() {
-      this.dir = await makeDir();
-    },
-    async after() {
-      await this.dir.cleanup();
-    },
-    get() {
-      return fsDrive({
-        folder: this.dir.resolve(".")
-      });
-    }
-  },
-  {
-    name: "github",
-    valid: () => process.env.GITHUB_ACCESS_TOKEN,
-    get() {
-      const drive = github({
-        owner: process.env.GITHUB_OWNER,
-        repo: "_db_to_cloud_test",
-        getAccessToken: () => process.env.GITHUB_ACCESS_TOKEN,
-        fetch
-      });
-      if (!this.drive) {
-        this.drive = drive;
-      }
-      return drive;
-    },
-    async after() {
-      for (const path of this.drive.shaCache.keys()) {
-        await this.drive.delete(path);
-      }
-    }
-  },
-  {
-    name: "dropbox",
-    valid: () => process.env.DROPBOX_ACCESS_TOKEN,
-    get() {
-      const drive = dropbox({
-        fetch,
-        getAccessToken: () => process.env.DROPBOX_ACCESS_TOKEN
-      });
-      if (!this.drive) {
-        this.drive = drive;
-      }
-      return drive;
-    },
-    async after() {
-      await this.drive.delete("docs");
-      await this.drive.delete("changes");
-      await this.drive.delete("meta.json");
-    }
-  },
-  {
-    name: "onedrive",
-    valid: () => process.env.AZURE_APP_ID,
-    async before() {
-      this.token = await getOneDriveAccessToken();
-    },
-    get() {
-      const drive = onedrive({
-        fetch,
-        getAccessToken: () => this.token
-      });
-      if (!this.drive) {
-        this.drive = drive;
-      }
-      return drive;
-    },
-    async after() {
-      await this.drive.delete("docs");
-      await this.drive.delete("changes");
-      await this.drive.delete("meta.json");
-    }
-  },
-  {
-    name: "google",
-    valid: () => process.env.GOOGLE_APP_ID,
-    async before() {
-      this.token = await getGoogleAccessToken();
-    },
-    get() {
-      const drive = google({
-        fetch,
-        FormData,
-        Blob: DummyBlob,
-        getAccessToken: () => this.token
-      });
-      if (!this.drive) {
-        this.drive = drive;
-      }
-      return drive;
-    },
-    async after() {
-      for (const meta of this.drive.fileMetaCache.values()) {
-        await this.drive.delete(meta.name);
-      }
-    }
-  }
-];
 
 async function suite(prepare) {
   const data = {

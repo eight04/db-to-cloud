@@ -1,6 +1,44 @@
 var dbToCloud = (function (exports) {
   'use strict';
 
+  function ownKeys(object, enumerableOnly) {
+    var keys = Object.keys(object);
+
+    if (Object.getOwnPropertySymbols) {
+      var symbols = Object.getOwnPropertySymbols(object);
+
+      if (enumerableOnly) {
+        symbols = symbols.filter(function (sym) {
+          return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+        });
+      }
+
+      keys.push.apply(keys, symbols);
+    }
+
+    return keys;
+  }
+
+  function _objectSpread2(target) {
+    for (var i = 1; i < arguments.length; i++) {
+      var source = arguments[i] != null ? arguments[i] : {};
+
+      if (i % 2) {
+        ownKeys(Object(source), true).forEach(function (key) {
+          _defineProperty(target, key, source[key]);
+        });
+      } else if (Object.getOwnPropertyDescriptors) {
+        Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+      } else {
+        ownKeys(Object(source)).forEach(function (key) {
+          Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+        });
+      }
+    }
+
+    return target;
+  }
+
   function asyncGeneratorStep(gen, resolve, reject, _next, _throw, key, arg) {
     try {
       var info = gen[key](arg);
@@ -52,40 +90,6 @@ var dbToCloud = (function (exports) {
     return obj;
   }
 
-  function ownKeys(object, enumerableOnly) {
-    var keys = Object.keys(object);
-
-    if (Object.getOwnPropertySymbols) {
-      var symbols = Object.getOwnPropertySymbols(object);
-      if (enumerableOnly) symbols = symbols.filter(function (sym) {
-        return Object.getOwnPropertyDescriptor(object, sym).enumerable;
-      });
-      keys.push.apply(keys, symbols);
-    }
-
-    return keys;
-  }
-
-  function _objectSpread2(target) {
-    for (var i = 1; i < arguments.length; i++) {
-      var source = arguments[i] != null ? arguments[i] : {};
-
-      if (i % 2) {
-        ownKeys(Object(source), true).forEach(function (key) {
-          _defineProperty(target, key, source[key]);
-        });
-      } else if (Object.getOwnPropertyDescriptors) {
-        Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
-      } else {
-        ownKeys(Object(source)).forEach(function (key) {
-          Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
-        });
-      }
-    }
-
-    return target;
-  }
-
   function _objectWithoutPropertiesLoose(source, excluded) {
     if (source == null) return {};
     var target = {};
@@ -131,14 +135,17 @@ var dbToCloud = (function (exports) {
   }
 
   function _iterableToArrayLimit(arr, i) {
-    if (typeof Symbol === "undefined" || !(Symbol.iterator in Object(arr))) return;
+    var _i = arr == null ? null : typeof Symbol !== "undefined" && arr[Symbol.iterator] || arr["@@iterator"];
+
+    if (_i == null) return;
     var _arr = [];
     var _n = true;
     var _d = false;
-    var _e = undefined;
+
+    var _s, _e;
 
     try {
-      for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) {
+      for (_i = _i.call(arr); !(_n = (_s = _i.next()).done); _n = true) {
         _arr.push(_s.value);
 
         if (i && _arr.length === i) break;
@@ -179,9 +186,9 @@ var dbToCloud = (function (exports) {
   }
 
   function _createForOfIteratorHelper(o, allowArrayLike) {
-    var it;
+    var it = typeof Symbol !== "undefined" && o[Symbol.iterator] || o["@@iterator"];
 
-    if (typeof Symbol === "undefined" || o[Symbol.iterator] == null) {
+    if (!it) {
       if (Array.isArray(o) || (it = _unsupportedIterableToArray(o)) || allowArrayLike && o && typeof o.length === "number") {
         if (it) o = it;
         var i = 0;
@@ -214,7 +221,7 @@ var dbToCloud = (function (exports) {
         err;
     return {
       s: function () {
-        it = o[Symbol.iterator]();
+        it = it.call(o);
       },
       n: function () {
         var step = it.next();
@@ -946,11 +953,6 @@ var dbToCloud = (function (exports) {
 
   var empty = (() => {});
 
-  const _module_exports_ = {};
-  Object.defineProperty(_module_exports_, "__esModule", {
-    value: true
-  });
-
   function percentToByte(p) {
     return String.fromCharCode(parseInt(p.slice(1), 16));
   }
@@ -958,8 +960,6 @@ var dbToCloud = (function (exports) {
   function encode(str) {
     return btoa(encodeURIComponent(str).replace(/%[0-9A-F]{2}/g, percentToByte));
   }
-
-  _module_exports_.encode = encode;
 
   function byteToPercent(b) {
     return "%".concat("00".concat(b.charCodeAt(0).toString(16)).slice(-2));
@@ -969,7 +969,7 @@ var dbToCloud = (function (exports) {
     return decodeURIComponent(Array.from(atob(str), byteToPercent).join(""));
   }
 
-  _module_exports_.decode = decode;
+  const _excluded$2 = ["path", "contentType", "headers", "format", "raw"];
 
   class RequestError extends Error {
     constructor(message, origin, code = origin && origin.status) {
@@ -991,9 +991,12 @@ var dbToCloud = (function (exports) {
   function createRequest({
     fetch,
     cooldown = 0,
-    getAccessToken
+    getAccessToken,
+    username,
+    password
   }) {
     const lock = createLock();
+    const basicAuth = username || password ? "Basic ".concat(encode("".concat(username, ":").concat(password))) : null;
     return args => {
       return lock.write( /*#__PURE__*/function () {
         var _ref = _asyncToGenerator(function* (done) {
@@ -1024,11 +1027,19 @@ var dbToCloud = (function (exports) {
             contentType = _ref2.contentType,
             _headers = _ref2.headers,
             format = _ref2.format,
-            args = _objectWithoutProperties(_ref2, ["path", "contentType", "headers", "format"]);
+            _ref2$raw = _ref2.raw,
+            raw = _ref2$raw === void 0 ? false : _ref2$raw,
+            args = _objectWithoutProperties(_ref2, _excluded$2);
 
-        const headers = {
-          "Authorization": "Bearer ".concat(yield getAccessToken())
-        };
+        const headers = {};
+
+        if (getAccessToken) {
+          headers["Authorization"] = "Bearer ".concat(yield getAccessToken());
+        }
+
+        if (basicAuth) {
+          headers["Authorization"] = basicAuth;
+        }
 
         if (contentType) {
           headers["Content-Type"] = contentType;
@@ -1038,9 +1049,10 @@ var dbToCloud = (function (exports) {
 
         while (true) {
           // eslint-disable-line no-constant-condition
+          // console.log("req", path, args, headers);
           const res = yield fetch(path, _objectSpread2({
             headers
-          }, args));
+          }, args)); // console.log("res", path, args, res.status, headers);
 
           if (!res.ok) {
             const retry = res.headers.get("Retry-After");
@@ -1056,6 +1068,10 @@ var dbToCloud = (function (exports) {
 
             const text = yield res.text();
             throw new RequestError("failed to fetch [".concat(res.status, "]: ").concat(text), res);
+          }
+
+          if (raw) {
+            return res;
           }
 
           if (format) {
@@ -1075,7 +1091,7 @@ var dbToCloud = (function (exports) {
     }
   }
 
-  function createDrive({
+  function createDrive$4({
     userAgent = "db-to-cloud",
     owner,
     repo,
@@ -1158,7 +1174,7 @@ var dbToCloud = (function (exports) {
           path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file)
         });
         shaCache.set(result.path, result.sha);
-        return _module_exports_.decode(result.content);
+        return decode(result.content);
       });
       return _get.apply(this, arguments);
     }
@@ -1171,7 +1187,7 @@ var dbToCloud = (function (exports) {
       _put = _asyncToGenerator(function* (file, data, overwrite = true) {
         const params = {
           message: "",
-          content: _module_exports_.encode(data)
+          content: encode(data)
         };
 
         if (overwrite && shaCache.has(file)) {
@@ -1250,7 +1266,9 @@ var dbToCloud = (function (exports) {
     }
   }
 
-  function createDrive$1({
+  const _excluded$1 = ["path", "body"];
+
+  function createDrive$3({
     getAccessToken,
     fetch = (typeof self !== "undefined" ? self : global).fetch
   }) {
@@ -1270,7 +1288,7 @@ var dbToCloud = (function (exports) {
     function requestRPC(_ref) {
       let path = _ref.path,
           body = _ref.body,
-          args = _objectWithoutProperties(_ref, ["path", "body"]);
+          args = _objectWithoutProperties(_ref, _excluded$1);
 
       return request(_objectSpread2({
         method: "POST",
@@ -1575,7 +1593,7 @@ var dbToCloud = (function (exports) {
     }
   }
 
-  function createDrive$3({
+  function createDrive$1({
     getAccessToken,
     fetch = (typeof self !== "undefined" ? self : global).fetch,
     FormData = (typeof self !== "undefined" ? self : global).FormData,
@@ -1879,13 +1897,314 @@ var dbToCloud = (function (exports) {
     }
   }
 
+  function dirname(path) {
+    const dir = path.replace(/[/\\][^/\\]+\/?$/, "");
+    if (dir === path) return ".";
+    return dir;
+  }
+
+  const _excluded = ["path"];
+
+  function arrayify(o) {
+    return Array.isArray(o) ? o : [o];
+  }
+
+  function xmlToJSON(node) {
+    // FIXME: xmldom doesn't support children
+    const children = Array.prototype.filter.call(node.childNodes, i => i.nodeType === 1);
+
+    if (!children.length) {
+      return node.textContent;
+    }
+
+    const o = {};
+
+    var _iterator = _createForOfIteratorHelper(children),
+        _step;
+
+    try {
+      for (_iterator.s(); !(_step = _iterator.n()).done;) {
+        const c = _step.value;
+        const cResult = xmlToJSON(c);
+
+        if (!o[c.localName]) {
+          o[c.localName] = cResult;
+        } else if (!Array.isArray(o[c.localName])) {
+          const list = [o[c.localName]];
+          list.push(cResult);
+          o[c.localName] = list;
+        } else {
+          o[c.localName].push(cResult);
+        }
+      }
+    } catch (err) {
+      _iterator.e(err);
+    } finally {
+      _iterator.f();
+    }
+
+    return o;
+  }
+
+  function createDrive({
+    username,
+    password,
+    url,
+    fetch = (typeof self !== "undefined" ? self : global).fetch,
+    DOMParser = (typeof self !== "undefined" ? self : global).DOMParser
+  }) {
+    if (!url.endsWith("/")) {
+      url += "/";
+    }
+    const request = createRequest({
+      fetch,
+      username,
+      password
+    });
+    return {
+      name: "webdav",
+      get,
+      put,
+      post,
+      delete: delete_,
+      list // acquireLock,
+      // releaseLock
+
+    };
+
+    function requestDAV(_x) {
+      return _requestDAV.apply(this, arguments);
+    }
+
+    function _requestDAV() {
+      _requestDAV = _asyncToGenerator(function* (_ref) {
+        let path = _ref.path,
+            args = _objectWithoutProperties(_ref, _excluded);
+
+        const text = yield request(_objectSpread2({
+          path: "".concat(url).concat(path)
+        }, args));
+        if (args.format || typeof text !== "string" || !text) return text;
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(text, "application/xml");
+        const result = xmlToJSON(xml);
+
+        if (result.error) {
+          throw new Error("Failed requesting DAV at ".concat(url).concat(path, ": ").concat(JSON.stringify(result.error)));
+        }
+
+        if (result.multistatus) {
+          result.multistatus.response = arrayify(result.multistatus.response);
+
+          var _iterator2 = _createForOfIteratorHelper(result.multistatus.response),
+              _step2;
+
+          try {
+            for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
+              const r = _step2.value;
+
+              if (r.error) {
+                throw new Error("Failed requesting DAV at ".concat(url).concat(path, ": ").concat(r.href, " ").concat(r.error));
+              }
+            }
+          } catch (err) {
+            _iterator2.e(err);
+          } finally {
+            _iterator2.f();
+          }
+        }
+
+        return result;
+      });
+      return _requestDAV.apply(this, arguments);
+    }
+
+    function list(_x2) {
+      return _list.apply(this, arguments);
+    }
+
+    function _list() {
+      _list = _asyncToGenerator(function* (file) {
+        if (!file.endsWith("/")) {
+          file += "/";
+        }
+
+        const result = yield requestDAV({
+          method: "PROPFIND",
+          path: file,
+          contentType: "application/xml",
+          body: "<?xml version=\"1.0\" encoding=\"utf-8\" ?> \n        <propfind xmlns=\"DAV:\">\n          <allprop/>\n        </propfind>",
+          headers: {
+            "Depth": "1"
+          }
+        });
+        const files = [];
+
+        var _iterator3 = _createForOfIteratorHelper(arrayify(result.multistatus.response)),
+            _step3;
+
+        try {
+          for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
+            const entry = _step3.value;
+
+            if (arrayify(entry.propstat).some(s => s.prop.resourcetype && s.prop.resourcetype.collection !== undefined)) {
+              continue;
+            }
+
+            const base = "".concat(url).concat(file);
+            const absUrl = new URL(entry.href, base).href;
+            const name = absUrl.slice(base.length);
+            files.push(name);
+          }
+        } catch (err) {
+          _iterator3.e(err);
+        } finally {
+          _iterator3.f();
+        }
+
+        return files;
+      });
+      return _list.apply(this, arguments);
+    }
+
+    function get(_x3) {
+      return _get.apply(this, arguments);
+    }
+
+    function _get() {
+      _get = _asyncToGenerator(function* (file) {
+        return yield requestDAV({
+          method: "GET",
+          path: file,
+          format: "text"
+        });
+      });
+      return _get.apply(this, arguments);
+    }
+
+    function put(_x4, _x5) {
+      return _put.apply(this, arguments);
+    }
+
+    function _put() {
+      _put = _asyncToGenerator(function* (file, data) {
+        return yield withDir(dirname(file), () => requestDAV({
+          method: "PUT",
+          path: file,
+          contentType: "application/octet-stream",
+          body: data
+        }));
+      });
+      return _put.apply(this, arguments);
+    }
+
+    function withDir(_x6, _x7) {
+      return _withDir.apply(this, arguments);
+    }
+
+    function _withDir() {
+      _withDir = _asyncToGenerator(function* (dir, cb) {
+        try {
+          return yield cb();
+        } catch (err) {
+          if (err.code !== 409 && err.code !== 404 || dir === ".") {
+            throw err;
+          }
+        }
+
+        yield withDir(dirname(dir), () => requestDAV({
+          method: "MKCOL",
+          path: dir
+        }));
+        return yield cb();
+      });
+      return _withDir.apply(this, arguments);
+    }
+
+    function post(_x8, _x9) {
+      return _post.apply(this, arguments);
+    }
+
+    function _post() {
+      _post = _asyncToGenerator(function* (file, data) {
+        try {
+          return yield withDir(dirname(file), () => requestDAV({
+            method: "PUT",
+            path: file,
+            body: data,
+            contentType: "octet-stream",
+            headers: {
+              // FIXME: seems webdav-server doesn't support etag, what about others?
+              "If-None-Match": "*"
+            }
+          }));
+        } catch (err) {
+          if (err.code === 412) {
+            err.code = "EEXIST";
+          }
+
+          throw err;
+        }
+      });
+      return _post.apply(this, arguments);
+    }
+
+    function delete_(_x10) {
+      return _delete_.apply(this, arguments);
+    } // async function acquireLock(mins) {
+    // const r = await requestDAV({
+    // method: "LOCK",
+    // path: "",
+    // body: 
+    // `<?xml version="1.0" encoding="utf-8" ?> 
+    // <lockinfo xmlns='DAV:'> 
+    // <lockscope><exclusive/></lockscope> 
+    // <locktype><write/></locktype> 
+    // </lockinfo> `,
+    // headers: {
+    // "Timeout": `Second-${mins * 60}`
+    // },
+    // raw: true
+    // });
+    // lockToken = r.headers.get("Lock-Token");
+    // }
+    // async function releaseLock() {
+    // await requestDAV({
+    // method: "UNLOCK",
+    // path: "",
+    // headers: {
+    // "Lock-Token": lockToken
+    // }
+    // });
+    // }
+
+
+    function _delete_() {
+      _delete_ = _asyncToGenerator(function* (file) {
+        // FIXME: support deleting collections?
+        // FIXME: handle errors?
+        try {
+          yield requestDAV({
+            method: "DELETE",
+            path: file
+          });
+        } catch (err) {
+          if (err.code === 404) return;
+          throw err;
+        }
+      });
+      return _delete_.apply(this, arguments);
+    }
+  }
+
   var index = /*#__PURE__*/Object.freeze({
     __proto__: null,
     fsDrive: empty,
-    github: createDrive,
-    dropbox: createDrive$1,
+    github: createDrive$4,
+    dropbox: createDrive$3,
     onedrive: createDrive$2,
-    google: createDrive$3
+    google: createDrive$1,
+    webdav: createDrive
   });
 
   exports.dbToCloud = dbToCloud;

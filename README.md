@@ -369,6 +369,20 @@ This adapter stores data to OneDrive.
 
 If `fetch` is not supplied, use the global variable.
 
+### webdav
+
+```js
+webdav({
+  username: String,
+  password: String,
+  url: String,
+  fetch?,
+  DOMParser?
+}) => CloudAdapter
+```
+
+This adapter stores data to webdav.
+
 User-defined cloud drive adapter
 --------------------------------
 
