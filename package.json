@@ -41,6 +41,7 @@
     "mocha-logger": "^1.0.7",
     "rollup": "^2.56.3",
     "rollup-plugin-cjs-es": "^1.0.1",
+    "rollup-plugin-re": "^1.0.7",
     "rollup-plugin-terser": "^7.0.2",
     "sinon": "^11.1.2",
     "tempdir-yaml": "^0.3.0",
