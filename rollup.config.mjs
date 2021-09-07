@@ -18,7 +18,7 @@ function config({output, plugins = []}) {
       alias({
         entries: {
           "./fs-drive": require.resolve("./shim/empty"),
-          "path": require.resolve("./shim/path")
+          "path": require.resolve("./shim/path.mjs")
         }
       }),
       resolve({

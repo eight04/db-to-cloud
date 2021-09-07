@@ -14,13 +14,5 @@ module.exports = {
 	],
   "parserOptions": {
     "ecmaVersion": 2018
-  },
-  "overrides": [
-    {
-      "files": ["rollup.config.js"],
-      "parserOptions": {
-        "sourceType": "module"
-      }
-    }
-  ]
+  }
 };

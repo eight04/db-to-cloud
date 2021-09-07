@@ -11,7 +11,7 @@
     "onedrive"
   ],
   "scripts": {
-    "lint": "eslint **/*.js --cache",
+    "lint": "eslint . --cache",
     "test": "npm run lint && c8 --reporter=lcov mocha -b",
     "preversion": "npm test",
     "version": "npm run build && git add .",
