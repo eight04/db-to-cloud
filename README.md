@@ -173,7 +173,12 @@ dbToCloud({
   onWarn?: (message: String) => void,
   onProgress?: (progressEvent: Object) => void,
   
-  lockExpire?: Number
+  lockExpire?: Number = 60,
+  
+  retryMaxAttempts?: Number = 5,
+  retryExp?: Number = 1.5,
+  retryDelay?: Number = 10
+  
 }) => sync: SyncController
 ```
 
@@ -219,7 +224,9 @@ When the phase is `pull` or `push`, `total` and `loaded` indicates how many chan
 
 Note that `change._rev` is undefined in the first pull. The library doesn't know the revision until the data is fetched.
 
-When the sync task starts, the cloud drive will be locked. However, if the process is interrupted (e.g. the browser crashed) and failed to unlock, the lock will expire after `lockExpire` minutes. Default: `60`.
+When the sync task starts, the cloud drive will be locked. However, if the process is interrupted (e.g. the browser crashed) and failed to unlock, the lock will expire after `lockExpire` minutes.
+
+Before pushing files to DB, SyncController has to acquire the lock first. If the lock is in used, it will wait `retryDelay * retryExp ^ n` seconds and try again. If it still failes after `retryMaxAttempts` times, an error will be thrown.
 
 ### sync.use
 
