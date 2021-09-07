@@ -118,7 +118,7 @@ async function suite(prepare) {
 
   logger.log("start and sync with the second instance");
 
-  const {sync: sync2, data: data2, options: options2} = prepare();
+  const {sync: sync2, data: data2, options: options2} = prepare({}, {retryMaxAttempts: 0});
   await sync2.init();
   await sync2.syncNow();
   assert.deepStrictEqual(data2, data);
@@ -202,7 +202,10 @@ async function suite(prepare) {
   await delay(1500);
   await Promise.all([
     p,
-    assert.rejects(() => sync2.syncNow(false), {code: "EEXIST"})
+    assert.rejects(
+      () => sync2.syncNow(false),
+      {message: "Failed acquiring lock"}
+    )
   ]);
 
   options.fetchDelay = 0;
@@ -244,12 +247,12 @@ describe("functional", () => {
       it("run suite", async function() {
         this.timeout(5 * 60 * 1000);
         const getDrive = adapter.get.bind(adapter);
-        await suite(data => prepare(getDrive, data));
+        await suite((...args) => prepare(getDrive, ...args));
       });
     });
   }
   
-  function prepare(getDrive, data = {}) {
+  function prepare(getDrive, data = {}, driveOptions) {
     const compareRevision = sinon.spy((a, b) => a - b);
     const options = {
       fetchDelay: 0,
@@ -277,7 +280,8 @@ describe("functional", () => {
       onProgress: sinon.spy(),
       compareRevision,
       getState: sinon.spy(),
-      setState: sinon.spy()
+      setState: sinon.spy(),
+      ...driveOptions
     };
     const sync = dbToCloud(options);
     const drive = getDrive();
