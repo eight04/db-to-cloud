@@ -4,5 +4,5 @@ module.exports = [
   require("./dropbox"),
   require("./onedrive"),
   require("./google"),
-  // require("./webdav")
+  require("./webdav")
 ];
