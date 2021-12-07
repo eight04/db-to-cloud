@@ -500,6 +500,12 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
+* 0.7.0 (Dec 7, 2021)
+
+  - Add: support webdav.
+  - Add: retry on acquire lock error.
+  - Add: `LockError`.
+
 * 0.6.0 (Feb 10, 2021)
   
   - Change: initialize cloud adapter in `syncNow` so adapter error will interrupt the sync process instead of crashing the entire app.
