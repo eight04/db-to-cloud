@@ -204,7 +204,7 @@ async function suite(prepare) {
     p,
     assert.rejects(
       () => sync2.syncNow(false),
-      {message: "Failed acquiring lock"}
+      {message: /the database is locked/i}
     )
   ]);
 
