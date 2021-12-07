@@ -1,8 +1,8 @@
 [
+  "~./shim/empty.js",
   "lib/drive/dropbox.js",
   "lib/drive/github.js",
   "lib/drive/google.js",
   "lib/drive/onedrive.js",
-  "lib/drive/webdav.js",
-  "shim/empty.js"
+  "lib/drive/webdav.js"
 ]

@@ -384,6 +384,19 @@ var dbToCloud = (function (exports) {
     }
   }
 
+  class LockError extends Error {
+    constructor(expire) {
+      super("The database is locked. Will expire at ".concat(new Date(expire).toLocaleString()));
+      this.expire = expire;
+      this.name = "LockError";
+
+      if (Error.captureStackTrace) {
+        Error.captureStackTrace(this, LockError);
+      }
+    }
+
+  }
+
   function debounced(fn) {
     let timer = 0;
     let q;
@@ -415,6 +428,10 @@ var dbToCloud = (function (exports) {
       });
       return o;
     }
+  }
+
+  function delay(time) {
+    return new Promise(resolve => setTimeout(resolve, time));
   }
 
   function buildDrive(_drive) {
@@ -479,15 +496,19 @@ var dbToCloud = (function (exports) {
             expire: Date.now() + expire * 60 * 1000
           });
         } catch (err) {
-          if (err.code === "EEXIST") {
-            const data = yield this.get("lock.json");
-
-            if (Date.now() > data.expire) {
-              yield this.delete("lock.json");
-            }
+          if (err.code !== "EEXIST") {
+            throw err;
           }
 
-          throw err;
+          const data = yield this.get("lock.json");
+
+          if (Date.now() > data.expire) {
+            // FIXME: this may delete a different lock created by other instances
+            yield this.delete("lock.json");
+            throw new Error("Found expired lock, please try again");
+          }
+
+          throw new LockError(data.expire);
         }
       });
       return _acquireLock.apply(this, arguments);
@@ -557,7 +578,10 @@ var dbToCloud = (function (exports) {
     compareRevision,
     getState,
     setState,
-    lockExpire = 60
+    lockExpire = 60,
+    retryMaxAttempts = 5,
+    retryExp = 1.5,
+    retryDelay = 10
   }) {
     let _drive2;
 
@@ -860,7 +884,32 @@ var dbToCloud = (function (exports) {
 
     function _sync() {
       _sync = _asyncToGenerator(function* () {
-        yield _drive2.acquireLock(lockExpire);
+        let tried = 0;
+        let wait = retryDelay;
+        let lastErr;
+
+        while (true) {
+          // eslint-disable-line no-constant-condition
+          try {
+            yield _drive2.acquireLock(lockExpire);
+            break;
+          } catch (err) {
+            if (err.name !== "LockError") {
+              throw err;
+            }
+
+            lastErr = err;
+          }
+
+          tried++;
+
+          if (tried >= retryMaxAttempts) {
+            throw lastErr;
+          }
+
+          yield delay(wait * 1000);
+          wait *= retryExp;
+        }
 
         try {
           yield syncPull();
@@ -982,10 +1031,6 @@ var dbToCloud = (function (exports) {
       }
     }
 
-  }
-
-  function delay(time) {
-    return new Promise(resolve => setTimeout(resolve, time));
   }
 
   function createRequest({
@@ -1665,7 +1710,7 @@ var dbToCloud = (function (exports) {
           if (rev.expire > Date.now()) {
             // failed, delete the lock
             yield revDelete(lock.id, headRevisionId);
-            throw new RequestError("failed to acquire lock", null, "EEXIST");
+            throw new LockError(rev.expire);
           } // delete outdated lock
 
 

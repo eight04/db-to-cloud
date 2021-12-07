@@ -1,7 +1,7 @@
 import resolve from "@rollup/plugin-node-resolve";
 import cjs from "rollup-plugin-cjs-es";
 import alias from "@rollup/plugin-alias";
-import babel from "@rollup/plugin-babel";
+import {babel} from "@rollup/plugin-babel";
 import {terser} from "rollup-plugin-terser";
 import re from "rollup-plugin-re";
 
@@ -17,8 +17,8 @@ function config({output, plugins = []}) {
     plugins: [
       alias({
         entries: {
-          "./fs-drive": require.resolve("./shim/empty"),
-          "path": require.resolve("./shim/path.mjs")
+          "./fs-drive": "./shim/empty.js",
+          "path": "./shim/path.mjs"
         }
       }),
       resolve({
