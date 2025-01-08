@@ -1,6 +1,5 @@
 /* eslint-env mocha */
 require("dotenv").config();
-// require("node-network-devtools").register();
 
 const assert = require("assert");
 
