@@ -9,14 +9,15 @@ async function getGoogleAccessToken() {
     return process.env.GOOGLE_ACCESS_TOKEN;
   }
   console.log("Open the URL to login:");
-  console.log(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_APP_ID}&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&scope=https://www.googleapis.com/auth/drive.appdata`);
-  const code = await question("\nInput the code:\n");
+  console.log(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_APP_ID}&redirect_uri=http://localhost&response_type=code&scope=https://www.googleapis.com/auth/drive.appdata`);
+  const url = await question("\nInput redirected URL:\n");
+  const code = new URL(url).searchParams.get("code");
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded'
     },
-    body: `client_id=${process.env.GOOGLE_APP_ID}&redirect_uri=urn:ietf:wg:oauth:2.0:oob&code=${code}&grant_type=authorization_code&client_secret=iPscd4omnupJFFIh-caMNV_J`
+    body: `client_id=${process.env.GOOGLE_APP_ID}&redirect_uri=http://localhost&code=${code}&grant_type=authorization_code&client_secret=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`
   });
   const result = await res.json();
   await clipboardy.write(`GOOGLE_ACCESS_TOKEN=${result.access_token}\nGOOGLE_ACCESS_TOKEN_EXPIRE=${Date.now() + result.expires_in * 1000}`);
