@@ -200,13 +200,11 @@ async function suite(prepare) {
   sync.put(1, data[1]._rev);
   const p = sync.syncNow();
   await delay(1500);
-  await Promise.all([
-    p,
-    assert.rejects(
-      () => sync2.syncNow(false),
-      {message: /the database is locked/i}
-    )
-  ]);
+  await assert.rejects(
+    () => sync2.syncNow(false),
+    {message: /the database is locked/i}
+  );
+  await p;
 
   options.fetchDelay = 0;
 }
