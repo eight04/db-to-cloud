@@ -385,7 +385,7 @@ webdav({
   url: String,
   fetch?,
   DOMParser?,
-  parseXML?: Function
+  parseXML?: async Function
 }) => CloudAdapter
 ```
 

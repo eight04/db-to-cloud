@@ -5,6 +5,6 @@ export function dirname(path) {
 }
 
 export function basename(path) {
-  const match = path.match(/([^/\\]+)[/\\]?$/);
-  return match ? match[1] : path;
+  const match = path.match(/([^/\\]+)[/\\]*$/);
+  return match ? match[1] : "";
 }
