@@ -7,7 +7,7 @@ const {webdav} = require("../..").drive;
 
 module.exports = {
   name: "webdav",
-  valid: () => process.env.WEBDAV_USER,
+  valid: () => process.env.WEBDAV_USER && process.env.WEBDAV_PASS && process.env.WEBDAV_URL,
   get() {
     this.drive = webdav({
       username: process.env.WEBDAV_USER,
