@@ -1,292 +1,230 @@
 var dbToCloud = (function (exports) {
   'use strict';
 
-  function ownKeys(object, enumerableOnly) {
-    var keys = Object.keys(object);
-
-    if (Object.getOwnPropertySymbols) {
-      var symbols = Object.getOwnPropertySymbols(object);
-
-      if (enumerableOnly) {
-        symbols = symbols.filter(function (sym) {
-          return Object.getOwnPropertyDescriptor(object, sym).enumerable;
-        });
-      }
-
-      keys.push.apply(keys, symbols);
-    }
-
-    return keys;
+  function _arrayLikeToArray(r, a) {
+    (null == a || a > r.length) && (a = r.length);
+    for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e];
+    return n;
   }
-
-  function _objectSpread2(target) {
-    for (var i = 1; i < arguments.length; i++) {
-      var source = arguments[i] != null ? arguments[i] : {};
-
-      if (i % 2) {
-        ownKeys(Object(source), true).forEach(function (key) {
-          _defineProperty(target, key, source[key]);
-        });
-      } else if (Object.getOwnPropertyDescriptors) {
-        Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
-      } else {
-        ownKeys(Object(source)).forEach(function (key) {
-          Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
-        });
-      }
-    }
-
-    return target;
+  function _arrayWithHoles(r) {
+    if (Array.isArray(r)) return r;
   }
-
-  function asyncGeneratorStep(gen, resolve, reject, _next, _throw, key, arg) {
+  function asyncGeneratorStep(n, t, e, r, o, a, c) {
     try {
-      var info = gen[key](arg);
-      var value = info.value;
-    } catch (error) {
-      reject(error);
-      return;
+      var i = n[a](c),
+        u = i.value;
+    } catch (n) {
+      return void e(n);
     }
-
-    if (info.done) {
-      resolve(value);
-    } else {
-      Promise.resolve(value).then(_next, _throw);
-    }
+    i.done ? t(u) : Promise.resolve(u).then(r, o);
   }
-
-  function _asyncToGenerator(fn) {
+  function _asyncToGenerator(n) {
     return function () {
-      var self = this,
-          args = arguments;
-      return new Promise(function (resolve, reject) {
-        var gen = fn.apply(self, args);
-
-        function _next(value) {
-          asyncGeneratorStep(gen, resolve, reject, _next, _throw, "next", value);
+      var t = this,
+        e = arguments;
+      return new Promise(function (r, o) {
+        var a = n.apply(t, e);
+        function _next(n) {
+          asyncGeneratorStep(a, r, o, _next, _throw, "next", n);
         }
-
-        function _throw(err) {
-          asyncGeneratorStep(gen, resolve, reject, _next, _throw, "throw", err);
+        function _throw(n) {
+          asyncGeneratorStep(a, r, o, _next, _throw, "throw", n);
         }
-
-        _next(undefined);
+        _next(void 0);
       });
     };
   }
-
-  function _defineProperty(obj, key, value) {
-    if (key in obj) {
-      Object.defineProperty(obj, key, {
-        value: value,
-        enumerable: true,
-        configurable: true,
-        writable: true
-      });
-    } else {
-      obj[key] = value;
-    }
-
-    return obj;
-  }
-
-  function _objectWithoutPropertiesLoose(source, excluded) {
-    if (source == null) return {};
-    var target = {};
-    var sourceKeys = Object.keys(source);
-    var key, i;
-
-    for (i = 0; i < sourceKeys.length; i++) {
-      key = sourceKeys[i];
-      if (excluded.indexOf(key) >= 0) continue;
-      target[key] = source[key];
-    }
-
-    return target;
-  }
-
-  function _objectWithoutProperties(source, excluded) {
-    if (source == null) return {};
-
-    var target = _objectWithoutPropertiesLoose(source, excluded);
-
-    var key, i;
-
-    if (Object.getOwnPropertySymbols) {
-      var sourceSymbolKeys = Object.getOwnPropertySymbols(source);
-
-      for (i = 0; i < sourceSymbolKeys.length; i++) {
-        key = sourceSymbolKeys[i];
-        if (excluded.indexOf(key) >= 0) continue;
-        if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
-        target[key] = source[key];
-      }
-    }
-
-    return target;
-  }
-
-  function _slicedToArray(arr, i) {
-    return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest();
-  }
-
-  function _arrayWithHoles(arr) {
-    if (Array.isArray(arr)) return arr;
-  }
-
-  function _iterableToArrayLimit(arr, i) {
-    var _i = arr == null ? null : typeof Symbol !== "undefined" && arr[Symbol.iterator] || arr["@@iterator"];
-
-    if (_i == null) return;
-    var _arr = [];
-    var _n = true;
-    var _d = false;
-
-    var _s, _e;
-
-    try {
-      for (_i = _i.call(arr); !(_n = (_s = _i.next()).done); _n = true) {
-        _arr.push(_s.value);
-
-        if (i && _arr.length === i) break;
-      }
-    } catch (err) {
-      _d = true;
-      _e = err;
-    } finally {
-      try {
-        if (!_n && _i["return"] != null) _i["return"]();
-      } finally {
-        if (_d) throw _e;
-      }
-    }
-
-    return _arr;
-  }
-
-  function _unsupportedIterableToArray(o, minLen) {
-    if (!o) return;
-    if (typeof o === "string") return _arrayLikeToArray(o, minLen);
-    var n = Object.prototype.toString.call(o).slice(8, -1);
-    if (n === "Object" && o.constructor) n = o.constructor.name;
-    if (n === "Map" || n === "Set") return Array.from(o);
-    if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen);
-  }
-
-  function _arrayLikeToArray(arr, len) {
-    if (len == null || len > arr.length) len = arr.length;
-
-    for (var i = 0, arr2 = new Array(len); i < len; i++) arr2[i] = arr[i];
-
-    return arr2;
-  }
-
-  function _nonIterableRest() {
-    throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
-  }
-
-  function _createForOfIteratorHelper(o, allowArrayLike) {
-    var it = typeof Symbol !== "undefined" && o[Symbol.iterator] || o["@@iterator"];
-
-    if (!it) {
-      if (Array.isArray(o) || (it = _unsupportedIterableToArray(o)) || allowArrayLike && o && typeof o.length === "number") {
-        if (it) o = it;
-        var i = 0;
-
-        var F = function () {};
-
+  function _createForOfIteratorHelper(r, e) {
+    var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"];
+    if (!t) {
+      if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) {
+        t && (r = t);
+        var n = 0,
+          F = function () {};
         return {
           s: F,
           n: function () {
-            if (i >= o.length) return {
-              done: true
-            };
-            return {
-              done: false,
-              value: o[i++]
+            return n >= r.length ? {
+              done: !0
+            } : {
+              done: !1,
+              value: r[n++]
             };
           },
-          e: function (e) {
-            throw e;
+          e: function (r) {
+            throw r;
           },
           f: F
         };
       }
-
       throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
     }
-
-    var normalCompletion = true,
-        didErr = false,
-        err;
+    var o,
+      a = !0,
+      u = !1;
     return {
       s: function () {
-        it = it.call(o);
+        t = t.call(r);
       },
       n: function () {
-        var step = it.next();
-        normalCompletion = step.done;
-        return step;
+        var r = t.next();
+        return a = r.done, r;
       },
-      e: function (e) {
-        didErr = true;
-        err = e;
+      e: function (r) {
+        u = !0, o = r;
       },
       f: function () {
         try {
-          if (!normalCompletion && it.return != null) it.return();
+          a || null == t.return || t.return();
         } finally {
-          if (didErr) throw err;
+          if (u) throw o;
         }
       }
     };
+  }
+  function _defineProperty(e, r, t) {
+    return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, {
+      value: t,
+      enumerable: !0,
+      configurable: !0,
+      writable: !0
+    }) : e[r] = t, e;
+  }
+  function _iterableToArrayLimit(r, l) {
+    var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"];
+    if (null != t) {
+      var e,
+        n,
+        i,
+        u,
+        a = [],
+        f = !0,
+        o = !1;
+      try {
+        if (i = (t = t.call(r)).next, 0 === l) {
+          if (Object(t) !== t) return;
+          f = !1;
+        } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0);
+      } catch (r) {
+        o = !0, n = r;
+      } finally {
+        try {
+          if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return;
+        } finally {
+          if (o) throw n;
+        }
+      }
+      return a;
+    }
+  }
+  function _nonIterableRest() {
+    throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
+  }
+  function ownKeys(e, r) {
+    var t = Object.keys(e);
+    if (Object.getOwnPropertySymbols) {
+      var o = Object.getOwnPropertySymbols(e);
+      r && (o = o.filter(function (r) {
+        return Object.getOwnPropertyDescriptor(e, r).enumerable;
+      })), t.push.apply(t, o);
+    }
+    return t;
+  }
+  function _objectSpread2(e) {
+    for (var r = 1; r < arguments.length; r++) {
+      var t = null != arguments[r] ? arguments[r] : {};
+      r % 2 ? ownKeys(Object(t), !0).forEach(function (r) {
+        _defineProperty(e, r, t[r]);
+      }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) {
+        Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
+      });
+    }
+    return e;
+  }
+  function _objectWithoutProperties(e, t) {
+    if (null == e) return {};
+    var o,
+      r,
+      i = _objectWithoutPropertiesLoose(e, t);
+    if (Object.getOwnPropertySymbols) {
+      var n = Object.getOwnPropertySymbols(e);
+      for (r = 0; r < n.length; r++) o = n[r], -1 === t.indexOf(o) && {}.propertyIsEnumerable.call(e, o) && (i[o] = e[o]);
+    }
+    return i;
+  }
+  function _objectWithoutPropertiesLoose(r, e) {
+    if (null == r) return {};
+    var t = {};
+    for (var n in r) if ({}.hasOwnProperty.call(r, n)) {
+      if (-1 !== e.indexOf(n)) continue;
+      t[n] = r[n];
+    }
+    return t;
+  }
+  function _slicedToArray(r, e) {
+    return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest();
+  }
+  function _toPrimitive(t, r) {
+    if ("object" != typeof t || !t) return t;
+    var e = t[Symbol.toPrimitive];
+    if (void 0 !== e) {
+      var i = e.call(t, r || "default");
+      if ("object" != typeof i) return i;
+      throw new TypeError("@@toPrimitive must return a primitive value.");
+    }
+    return ("string" === r ? String : Number)(t);
+  }
+  function _toPropertyKey(t) {
+    var i = _toPrimitive(t, "string");
+    return "symbol" == typeof i ? i : i + "";
+  }
+  function _unsupportedIterableToArray(r, a) {
+    if (r) {
+      if ("string" == typeof r) return _arrayLikeToArray(r, a);
+      var t = {}.toString.call(r).slice(8, -1);
+      return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0;
+    }
   }
 
   function createLock({
     maxActiveReader = Infinity
   } = {}) {
-    let firstTask;
-    let lastTask;
-    let activeReader = 0;
-    const self = {
+    var firstTask;
+    var lastTask;
+    var activeReader = 0;
+    var self = {
       read: fn => que(fn, false),
       write: fn => que(fn, true),
       length: 0
     };
     return self;
-
     function que(fn, block) {
-      const task = createTask({
+      var task = createTask({
         fn,
         block
       });
-
       if (!lastTask) {
         firstTask = lastTask = task;
       } else {
         lastTask.next = task;
         task.prev = lastTask;
         lastTask = task;
-
         if (!firstTask) {
           firstTask = lastTask;
         }
       }
-
       self.length++;
       deque();
       return task.q.promise;
     }
-
     function defer() {
-      const o = {};
+      var o = {};
       o.promise = new Promise((resolve, reject) => {
         o.resolve = resolve;
         o.reject = reject;
       });
       return o;
     }
-
     function createTask({
       fn,
       block = false,
@@ -304,44 +242,35 @@ var dbToCloud = (function (exports) {
         q2
       };
     }
-
     function deque() {
-      const task = firstTask;
-
+      var task = firstTask;
       if (!task || task.block && task.prev || task.prev && task.prev.block || activeReader >= maxActiveReader) {
         return;
       }
-
       if (!task.block) {
         activeReader++;
       }
-
       firstTask = task.next;
-      let result;
-
+      var result;
       try {
         result = task.fn(task.q2 && task.q2.resolve);
       } catch (err) {
-        task.q.reject(err); // auto release with sync error
+        task.q.reject(err);
+        // auto release with sync error
         // q2 is useless in this case
-
         onDone();
         return;
       }
-
       if (task.q2) {
         task.q2.promise.then(_onDone);
       }
-
       if (result && result.then) {
-        const pending = result.then(task.q.resolve, task.q.reject);
-
+        var pending = result.then(task.q.resolve, task.q.reject);
         if (!task.q2) {
           pending.then(onDone);
         }
       } else {
         task.q.resolve(result);
-
         if (!task.q2) {
           // it's a sync function and you don't want to release it manually, why
           // do you need a lock?
@@ -349,36 +278,27 @@ var dbToCloud = (function (exports) {
           return;
         }
       }
-
       deque();
-
       function onDone() {
         _onDone();
       }
-
       function _onDone(afterDone) {
         if (task.prev) {
           task.prev.next = task.next;
         }
-
         if (task.next) {
           task.next.prev = task.prev;
         }
-
         if (lastTask === task) {
           lastTask = task.prev;
         }
-
         if (!task.block) {
           activeReader--;
         }
-
         self.length--;
-
         if (afterDone) {
           afterDone();
         }
-
         deque();
       }
     }
@@ -389,39 +309,32 @@ var dbToCloud = (function (exports) {
       super("The database is locked. Will expire at ".concat(new Date(expire).toLocaleString()));
       this.expire = expire;
       this.name = "LockError";
-
       if (Error.captureStackTrace) {
         Error.captureStackTrace(this, LockError);
       }
     }
-
   }
 
   function debounced(fn) {
-    let timer = 0;
-    let q;
+    var timer = 0;
+    var q;
     return () => {
       if (timer) {
         clearTimeout(timer);
       }
-
       timer = setTimeout(run);
-
       if (!q) {
         q = defer();
       }
-
       return q.promise;
     };
-
     function run() {
       Promise.resolve(fn()).then(q.resolve, q.reject);
       timer = 0;
       q = null;
     }
-
     function defer() {
-      const o = {};
+      var o = {};
       o.promise = new Promise((resolve, reject) => {
         o.resolve = resolve;
         o.reject = reject;
@@ -429,66 +342,92 @@ var dbToCloud = (function (exports) {
       return o;
     }
   }
-
   function delay(time) {
     return new Promise(resolve => setTimeout(resolve, time));
   }
+  function xmlToJSON(node) {
+    // FIXME: xmldom doesn't support children
+    var children = Array.prototype.filter.call(node.childNodes, i => i.nodeType === 1);
+    if (!children.length) {
+      return node.textContent;
+    }
+    var o = {};
+    var _iterator = _createForOfIteratorHelper(children),
+      _step;
+    try {
+      for (_iterator.s(); !(_step = _iterator.n()).done;) {
+        var c = _step.value;
+        var cResult = xmlToJSON(c);
+        if (!o[c.localName]) {
+          o[c.localName] = cResult;
+        } else if (!Array.isArray(o[c.localName])) {
+          var list = [o[c.localName]];
+          list.push(cResult);
+          o[c.localName] = list;
+        } else {
+          o[c.localName].push(cResult);
+        }
+      }
+    } catch (err) {
+      _iterator.e(err);
+    } finally {
+      _iterator.f();
+    }
+    return o;
+  }
+  function createXMLParser(DOMParser) {
+    var parser;
+    return function parseXML(text) {
+      if (!parser) {
+        parser = new DOMParser();
+      }
+      var xml = parser.parseFromString(text, "application/xml");
+      return xmlToJSON(xml);
+    };
+  }
 
   function buildDrive(_drive) {
-    const drive = Object.create(_drive);
-
+    var drive = Object.create(_drive);
     drive.get = /*#__PURE__*/function () {
       var _ref = _asyncToGenerator(function* (path) {
         return JSON.parse(yield _drive.get(path));
       });
-
       return function (_x) {
         return _ref.apply(this, arguments);
       };
     }();
-
     drive.put = /*#__PURE__*/function () {
       var _ref2 = _asyncToGenerator(function* (path, data) {
         return yield _drive.put(path, JSON.stringify(data));
       });
-
       return function (_x2, _x3) {
         return _ref2.apply(this, arguments);
       };
     }();
-
     drive.post = /*#__PURE__*/function () {
       var _ref3 = _asyncToGenerator(function* (path, data) {
         return yield _drive.post(path, JSON.stringify(data));
       });
-
       return function (_x4, _x5) {
         return _ref3.apply(this, arguments);
       };
     }();
-
     drive.isInit = false;
-
     if (!drive.acquireLock) {
       drive.acquireLock = acquireLock;
       drive.releaseLock = releaseLock;
     }
-
     if (!drive.getMeta) {
       drive.getMeta = getMeta;
       drive.putMeta = putMeta;
     }
-
     if (!drive.peekChanges) {
       drive.peekChanges = peekChanges;
     }
-
     return drive;
-
     function acquireLock(_x6) {
       return _acquireLock.apply(this, arguments);
     }
-
     function _acquireLock() {
       _acquireLock = _asyncToGenerator(function* (expire) {
         try {
@@ -499,36 +438,29 @@ var dbToCloud = (function (exports) {
           if (err.code !== "EEXIST") {
             throw err;
           }
-
-          const data = yield this.get("lock.json");
-
+          var data = yield this.get("lock.json");
           if (Date.now() > data.expire) {
             // FIXME: this may delete a different lock created by other instances
             yield this.delete("lock.json");
             throw new Error("Found expired lock, please try again");
           }
-
           throw new LockError(data.expire);
         }
       });
       return _acquireLock.apply(this, arguments);
     }
-
     function releaseLock() {
       return _releaseLock.apply(this, arguments);
     }
-
     function _releaseLock() {
       _releaseLock = _asyncToGenerator(function* () {
         yield this.delete("lock.json");
       });
       return _releaseLock.apply(this, arguments);
     }
-
     function getMeta() {
       return _getMeta.apply(this, arguments);
     }
-
     function _getMeta() {
       _getMeta = _asyncToGenerator(function* () {
         try {
@@ -537,37 +469,31 @@ var dbToCloud = (function (exports) {
           if (err.code === "ENOENT" || err.code === 404) {
             return {};
           }
-
           throw err;
         }
       });
       return _getMeta.apply(this, arguments);
     }
-
     function putMeta(_x7) {
       return _putMeta.apply(this, arguments);
     }
-
     function _putMeta() {
       _putMeta = _asyncToGenerator(function* (data) {
         yield this.put("meta.json", data);
       });
       return _putMeta.apply(this, arguments);
     }
-
     function peekChanges(_x8) {
       return _peekChanges.apply(this, arguments);
     }
-
     function _peekChanges() {
       _peekChanges = _asyncToGenerator(function* (oldMeta) {
-        const newMeta = yield this.getMeta();
+        var newMeta = yield this.getMeta();
         return newMeta.lastChange !== oldMeta.lastChange;
       });
       return _peekChanges.apply(this, arguments);
     }
   }
-
   function dbToCloud({
     onGet,
     onPut,
@@ -583,14 +509,13 @@ var dbToCloud = (function (exports) {
     retryExp = 1.5,
     retryDelay = 10
   }) {
-    let _drive2;
-
-    let state;
-    let meta;
-    const changeCache = new Map();
-    const saveState = debounced(() => setState(_drive2, state));
-    const revisionCache = new Map();
-    const lock = createLock();
+    var _drive2;
+    var state;
+    var meta;
+    var changeCache = new Map();
+    var saveState = debounced(() => setState(_drive2, state));
+    var revisionCache = new Map();
+    var lock = createLock();
     return {
       use,
       init,
@@ -601,64 +526,50 @@ var dbToCloud = (function (exports) {
       drive: () => _drive2,
       isInit: () => Boolean(state && state.enabled)
     };
-
     function use(newDrive) {
       _drive2 = buildDrive(newDrive);
     }
-
     function init() {
-      return lock.write( /*#__PURE__*/_asyncToGenerator(function* () {
+      return lock.write(/*#__PURE__*/_asyncToGenerator(function* () {
         if (state && state.enabled) {
           return;
         }
-
         if (!_drive2) {
           throw new Error("cloud drive is undefined");
         }
-
         state = (yield getState(_drive2)) || {};
         state.enabled = true;
-
         if (!state.queue) {
           state.queue = [];
         }
       }));
     }
-
     function uninit() {
-      return lock.write( /*#__PURE__*/_asyncToGenerator(function* () {
+      return lock.write(/*#__PURE__*/_asyncToGenerator(function* () {
         if (!state || !state.enabled) {
           return;
         }
-
         state = meta = null;
         changeCache.clear();
         revisionCache.clear();
-
         if (_drive2.uninit && _drive2.isInit) {
           yield _drive2.uninit();
           _drive2.isInit = false;
         }
-
         yield saveState();
       }));
     }
-
     function syncPull() {
       return _syncPull.apply(this, arguments);
     }
-
     function _syncPull() {
       _syncPull = _asyncToGenerator(function* () {
         meta = yield _drive2.getMeta();
-
         if (!meta.lastChange || meta.lastChange === state.lastChange) {
           // nothing changes
           return;
         }
-
-        let changes = [];
-
+        var changes = [];
         if (!state.lastChange) {
           // pull everything
           changes = (yield _drive2.list("docs")).map(name => ({
@@ -666,29 +577,23 @@ var dbToCloud = (function (exports) {
             _id: name.slice(0, -5)
           }));
         } else {
-          const end = Math.floor((meta.lastChange - 1) / 100); // inclusive end
-
-          let i = Math.floor(state.lastChange / 100);
-
+          var end = Math.floor((meta.lastChange - 1) / 100); // inclusive end
+          var i = Math.floor(state.lastChange / 100);
           while (i <= end) {
-            const newChanges = yield _drive2.get("changes/".concat(i, ".json"));
+            var newChanges = yield _drive2.get("changes/".concat(i, ".json"));
             changeCache.set(i, newChanges);
             changes = changes.concat(newChanges);
             i++;
           }
-
           changes = changes.slice(state.lastChange % 100);
-        } // merge changes
-
-
-        const idx = new Map();
-
+        }
+        // merge changes
+        var idx = new Map();
         var _iterator = _createForOfIteratorHelper(changes),
-            _step;
-
+          _step;
         try {
           for (_iterator.s(); !(_step = _iterator.n()).done;) {
-            const change = _step.value;
+            var change = _step.value;
             idx.set(change._id, change);
           }
         } catch (err) {
@@ -696,35 +601,29 @@ var dbToCloud = (function (exports) {
         } finally {
           _iterator.f();
         }
-
-        let loaded = 0;
-
+        var loaded = 0;
         var _iterator2 = _createForOfIteratorHelper(idx),
-            _step2;
-
+          _step2;
         try {
           for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
-            const _step2$value = _slicedToArray(_step2.value, 2),
-                  id = _step2$value[0],
-                  change = _step2$value[1];
-
-            let doc, _rev;
-
+            var _step2$value = _slicedToArray(_step2.value, 2),
+              id = _step2$value[0],
+              _change = _step2$value[1];
+            var doc = void 0,
+              _rev = void 0;
             if (onProgress) {
               onProgress({
                 phase: 'pull',
                 total: idx.size,
                 loaded,
-                change
+                change: _change
               });
             }
-
-            if (change.action === "delete") {
-              yield onDelete(id, change._rev);
-            } else if (change.action === "put") {
+            if (_change.action === "delete") {
+              yield onDelete(id, _change._rev);
+            } else if (_change.action === "put") {
               try {
                 var _yield$_drive2$get = yield _drive2.get("docs/".concat(id, ".json"));
-
                 doc = _yield$_drive2$get.doc;
                 _rev = _yield$_drive2$get._rev;
               } catch (err) {
@@ -733,20 +632,15 @@ var dbToCloud = (function (exports) {
                   loaded++;
                   continue;
                 }
-
                 throw err;
               }
-
               yield onPut(doc);
-            } // record the remote revision
-
-
-            const rev = change._rev || _rev;
-
+            }
+            // record the remote revision
+            var rev = _change._rev || _rev;
             if (rev) {
               revisionCache.set(id, rev);
             }
-
             loaded++;
           }
         } catch (err) {
@@ -754,75 +648,63 @@ var dbToCloud = (function (exports) {
         } finally {
           _iterator2.f();
         }
-
         state.lastChange = meta.lastChange;
         yield saveState();
       });
       return _syncPull.apply(this, arguments);
     }
-
     function syncPush() {
       return _syncPush.apply(this, arguments);
     }
-
     function _syncPush() {
       _syncPush = _asyncToGenerator(function* () {
         if (!state.queue.length) {
           // nothing to push
           return;
-        } // snapshot
+        }
+        // snapshot
+        var changes = state.queue.slice();
 
-
-        const changes = state.queue.slice(); // merge changes
-
-        const idx = new Map();
-
+        // merge changes
+        var idx = new Map();
         var _iterator3 = _createForOfIteratorHelper(changes),
-            _step3;
-
+          _step3;
         try {
           for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
-            const change = _step3.value;
-            idx.set(change._id, change);
-          } // drop outdated change
-
+            var _change2 = _step3.value;
+            idx.set(_change2._id, _change2);
+          }
+          // drop outdated change
         } catch (err) {
           _iterator3.e(err);
         } finally {
           _iterator3.f();
         }
-
-        const newChanges = [];
-
+        var newChanges = [];
         var _iterator4 = _createForOfIteratorHelper(idx.values()),
-            _step4;
-
+          _step4;
         try {
           for (_iterator4.s(); !(_step4 = _iterator4.n()).done;) {
-            const change = _step4.value;
+            var _change3 = _step4.value;
             // FIXME: is it safe to assume that the local doc is newer when
             // remoteRev is undefined?
-            const remoteRev = revisionCache.get(change._id);
-
-            if (remoteRev !== undefined && compareRevision(change._rev, remoteRev) <= 0) {
+            var remoteRev = revisionCache.get(_change3._id);
+            if (remoteRev !== undefined && compareRevision(_change3._rev, remoteRev) <= 0) {
               continue;
             }
+            newChanges.push(_change3);
+          }
+          // FIXME: there should be no need to push data when !newChanges.length
 
-            newChanges.push(change);
-          } // FIXME: there should be no need to push data when !newChanges.length
           // start pushing
-
         } catch (err) {
           _iterator4.e(err);
         } finally {
           _iterator4.f();
         }
-
-        let loaded = 0;
-
+        var loaded = 0;
         for (var _i = 0, _newChanges = newChanges; _i < _newChanges.length; _i++) {
-          const change = _newChanges[_i];
-
+          var change = _newChanges[_i];
           if (onProgress) {
             onProgress({
               phase: 'push',
@@ -831,44 +713,40 @@ var dbToCloud = (function (exports) {
               change
             });
           }
-
           if (change.action === "delete") {
             yield _drive2.delete("docs/".concat(change._id, ".json"));
           } else if (change.action === "put") {
-            const doc = yield onGet(change._id, change._rev);
+            var doc = yield onGet(change._id, change._rev);
             yield _drive2.put("docs/".concat(change._id, ".json"), {
               doc,
               _rev: change._rev
             });
           }
-
           revisionCache.set(change._id, change._rev);
           loaded++;
-        } // push changes
+        }
 
-
-        let lastChanges;
-        let index; // meta is already pulled in syncPull
-
+        // push changes
+        var lastChanges;
+        var index;
+        // meta is already pulled in syncPull
         if (meta.lastChange) {
           index = Math.floor(meta.lastChange / 100);
-          const len = meta.lastChange % 100;
-          lastChanges = len ? changeCache.get(index) || (yield _drive2.get("changes/".concat(index, ".json"))) : []; // it is possible that JSON data contains more records defined by
+          var len = meta.lastChange % 100;
+          lastChanges = len ? changeCache.get(index) || (yield _drive2.get("changes/".concat(index, ".json"))) : [];
+          // it is possible that JSON data contains more records defined by
           // meta.lastChange
-
           lastChanges = lastChanges.slice(0, len).concat(newChanges);
         } else {
           // first sync
           index = 0;
           lastChanges = newChanges;
         }
-
-        for (let i = 0; i * 100 < lastChanges.length; i++) {
-          const window = lastChanges.slice(i * 100, (i + 1) * 100);
+        for (var i = 0; i * 100 < lastChanges.length; i++) {
+          var window = lastChanges.slice(i * 100, (i + 1) * 100);
           yield _drive2.put("changes/".concat(index + i, ".json"), window);
           changeCache.set(index + i, window);
         }
-
         meta.lastChange = (meta.lastChange || 0) + newChanges.length;
         yield _drive2.putMeta(meta);
         state.queue = state.queue.slice(changes.length);
@@ -877,17 +755,14 @@ var dbToCloud = (function (exports) {
       });
       return _syncPush.apply(this, arguments);
     }
-
     function sync() {
       return _sync.apply(this, arguments);
     }
-
     function _sync() {
       _sync = _asyncToGenerator(function* () {
-        let tried = 0;
-        let wait = retryDelay;
-        let lastErr;
-
+        var tried = 0;
+        var wait = retryDelay;
+        var lastErr;
         while (true) {
           // eslint-disable-line no-constant-condition
           try {
@@ -897,20 +772,15 @@ var dbToCloud = (function (exports) {
             if (err.name !== "LockError") {
               throw err;
             }
-
             lastErr = err;
           }
-
           tried++;
-
           if (tried >= retryMaxAttempts) {
             throw lastErr;
           }
-
           yield delay(wait * 1000);
           wait *= retryExp;
         }
-
         try {
           yield syncPull();
           yield syncPush();
@@ -920,30 +790,24 @@ var dbToCloud = (function (exports) {
       });
       return _sync.apply(this, arguments);
     }
-
     function syncNow(peek) {
-      return lock.write( /*#__PURE__*/_asyncToGenerator(function* () {
+      return lock.write(/*#__PURE__*/_asyncToGenerator(function* () {
         if (!state || !state.enabled) {
           throw new Error("Cannot sync now, the sync is not enabled");
         }
-
         if (_drive2.init && !_drive2.isInit) {
           yield _drive2.init();
           _drive2.isInit = true;
         }
-
         if (state.lastChange == null) {
           yield onFirstSync();
         }
-
         yield _syncNow(peek);
       }));
     }
-
     function _syncNow() {
       return _syncNow2.apply(this, arguments);
     }
-
     function _syncNow2() {
       _syncNow2 = _asyncToGenerator(function* (peek = true) {
         if (onProgress) {
@@ -951,16 +815,13 @@ var dbToCloud = (function (exports) {
             phase: 'start'
           });
         }
-
         try {
           if (!state.queue.length && peek && meta) {
-            const changed = yield _drive2.peekChanges(meta);
-
+            var changed = yield _drive2.peekChanges(meta);
             if (!changed) {
               return;
             }
           }
-
           yield sync();
         } finally {
           if (onProgress) {
@@ -972,12 +833,10 @@ var dbToCloud = (function (exports) {
       });
       return _syncNow2.apply(this, arguments);
     }
-
     function put(_id, _rev) {
       if (!state || !state.enabled) {
         return;
       }
-
       state.queue.push({
         _id,
         _rev,
@@ -985,12 +844,10 @@ var dbToCloud = (function (exports) {
       });
       saveState();
     }
-
     function delete_(_id, _rev) {
       if (!state || !state.enabled) {
         return;
       }
-
       state.queue.push({
         _id,
         _rev,
@@ -1000,39 +857,32 @@ var dbToCloud = (function (exports) {
     }
   }
 
-  var empty = (() => {});
+  var empty = () => {};
 
   function percentToByte(p) {
     return String.fromCharCode(parseInt(p.slice(1), 16));
   }
-
   function encode(str) {
     return btoa(encodeURIComponent(str).replace(/%[0-9A-F]{2}/g, percentToByte));
   }
-
   function byteToPercent(b) {
     return "%".concat("00".concat(b.charCodeAt(0).toString(16)).slice(-2));
   }
-
   function decode(str) {
     return decodeURIComponent(Array.from(atob(str), byteToPercent).join(""));
   }
 
-  const _excluded$2 = ["path", "contentType", "headers", "format", "raw"];
-
+  var _excluded$2 = ["path", "contentType", "headers", "format", "raw"];
   class RequestError extends Error {
     constructor(message, origin, code = origin && origin.status) {
       super(message);
       this.code = code;
       this.origin = origin;
-
       if (Error.captureStackTrace) {
         Error.captureStackTrace(this, RequestError);
       }
     }
-
   }
-
   function createRequest({
     fetch,
     cooldown = 0,
@@ -1040,10 +890,10 @@ var dbToCloud = (function (exports) {
     username,
     password
   }) {
-    const lock = createLock();
-    const basicAuth = username || password ? "Basic ".concat(encode("".concat(username, ":").concat(password))) : null;
+    var lock = createLock();
+    var basicAuth = username || password ? "Basic ".concat(encode("".concat(username, ":").concat(password))) : null;
     return args => {
-      return lock.write( /*#__PURE__*/function () {
+      return lock.write(/*#__PURE__*/function () {
         var _ref = _asyncToGenerator(function* (done) {
           try {
             return yield doRequest(args);
@@ -1055,80 +905,63 @@ var dbToCloud = (function (exports) {
             }
           }
         });
-
         return function (_x) {
           return _ref.apply(this, arguments);
         };
       }());
     };
-
     function doRequest(_x2) {
       return _doRequest.apply(this, arguments);
     }
-
     function _doRequest() {
       _doRequest = _asyncToGenerator(function* (_ref2) {
-        let path = _ref2.path,
-            contentType = _ref2.contentType,
-            _headers = _ref2.headers,
-            format = _ref2.format,
-            _ref2$raw = _ref2.raw,
-            raw = _ref2$raw === void 0 ? false : _ref2$raw,
-            args = _objectWithoutProperties(_ref2, _excluded$2);
-
-        const headers = {};
-
+        var path = _ref2.path,
+          contentType = _ref2.contentType,
+          _headers = _ref2.headers,
+          format = _ref2.format,
+          _ref2$raw = _ref2.raw,
+          raw = _ref2$raw === void 0 ? false : _ref2$raw,
+          args = _objectWithoutProperties(_ref2, _excluded$2);
+        var headers = {};
         if (getAccessToken) {
           headers["Authorization"] = "Bearer ".concat(yield getAccessToken());
         }
-
         if (basicAuth) {
           headers["Authorization"] = basicAuth;
         }
-
         if (contentType) {
           headers["Content-Type"] = contentType;
         }
-
         Object.assign(headers, _headers);
-
         while (true) {
           // eslint-disable-line no-constant-condition
           // console.log("req", path, args, headers);
-          const res = yield fetch(path, _objectSpread2({
+          var res = yield fetch(path, _objectSpread2({
             headers
-          }, args)); // console.log("res", path, args, res.status, headers);
-
+          }, args));
+          // console.log("res", path, args, res.status, headers);
           if (!res.ok) {
-            const retry = res.headers.get("Retry-After");
-
+            var retry = res.headers.get("Retry-After");
             if (retry) {
-              const time = Number(retry);
-
+              var time = Number(retry);
               if (time) {
                 yield delay(time * 1000);
                 continue;
               }
             }
-
-            const text = yield res.text();
+            var text = yield res.text();
             throw new RequestError("failed to fetch [".concat(res.status, "]: ").concat(text), res);
           }
-
           if (raw) {
             return res;
           }
-
           if (format) {
             return yield res[format]();
           }
-
-          const resContentType = res.headers.get("Content-Type");
-
+          var resContentType = res.headers.get("Content-Type");
           if (/application\/json/.test(resContentType)) {
             return yield res.json();
           }
-
           return yield res.text();
         }
       });
@@ -1143,12 +976,12 @@ var dbToCloud = (function (exports) {
     getAccessToken,
     fetch = (typeof self !== "undefined" ? self : global).fetch
   }) {
-    const request = createRequest({
+    var request = createRequest({
       fetch,
       getAccessToken,
       cooldown: 1000
     });
-    const shaCache = new Map();
+    var shaCache = new Map();
     return {
       name: "github",
       get,
@@ -1158,42 +991,34 @@ var dbToCloud = (function (exports) {
       list,
       shaCache
     };
-
     function requestAPI(args) {
       if (!args.headers) {
         args.headers = {};
       }
-
       if (!args.headers["User-Agent"]) {
         args.headers["User-Agent"] = userAgent;
       }
-
       if (!args.headers["Accept"]) {
         args.headers["Accept"] = "application/vnd.github.v3+json";
       }
-
       args.path = "https://api.github.com".concat(args.path);
       return request(args);
     }
-
     function list(_x) {
       return _list.apply(this, arguments);
     }
-
     function _list() {
       _list = _asyncToGenerator(function* (file) {
         // FIXME: This API has an upper limit of 1,000 files for a directory. If you need to retrieve more files, use the Git Trees API.
-        const result = yield requestAPI({
+        var result = yield requestAPI({
           path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file)
         });
-        const names = [];
-
+        var names = [];
         var _iterator = _createForOfIteratorHelper(result),
-            _step;
-
+          _step;
         try {
           for (_iterator.s(); !(_step = _iterator.n()).done;) {
-            const item = _step.value;
+            var item = _step.value;
             names.push(item.name);
             shaCache.set(item.path, item.sha);
           }
@@ -1202,20 +1027,17 @@ var dbToCloud = (function (exports) {
         } finally {
           _iterator.f();
         }
-
         return names;
       });
       return _list.apply(this, arguments);
     }
-
     function get(_x2) {
       return _get.apply(this, arguments);
     }
-
     function _get() {
       _get = _asyncToGenerator(function* (file) {
         // FIXME: This API supports files up to 1 megabyte in size.
-        const result = yield requestAPI({
+        var result = yield requestAPI({
           path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file)
         });
         shaCache.set(result.path, result.sha);
@@ -1223,31 +1045,26 @@ var dbToCloud = (function (exports) {
       });
       return _get.apply(this, arguments);
     }
-
     function put(_x3, _x4) {
       return _put.apply(this, arguments);
     }
-
     function _put() {
       _put = _asyncToGenerator(function* (file, data, overwrite = true) {
-        const params = {
+        var params = {
           message: "",
           content: encode(data)
         };
-
         if (overwrite && shaCache.has(file)) {
           params.sha = shaCache.get(file);
         }
-
-        const args = {
+        var args = {
           method: "PUT",
           path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file),
           contentType: "application/json",
           body: JSON.stringify(params)
         };
-        let retried = false;
-        let result;
-
+        var retried = false;
+        var result;
         while (!result) {
           try {
             result = yield requestAPI(args);
@@ -1255,41 +1072,32 @@ var dbToCloud = (function (exports) {
             if (err.code !== 422 || !err.message.includes("\\\"sha\\\" wasn't supplied")) {
               throw err;
             }
-
             if (!overwrite || retried) {
               err.code = "EEXIST";
               throw err;
             }
-
             yield get(file);
           }
-
           retried = true;
         }
-
         shaCache.set(file, result.content.sha);
       });
       return _put.apply(this, arguments);
     }
-
     function post(file, data) {
       return put(file, data, false);
     }
-
     function delete_(_x5) {
       return _delete_.apply(this, arguments);
     }
-
     function _delete_() {
       _delete_ = _asyncToGenerator(function* (file) {
         try {
-          let sha = shaCache.get(file);
-
+          var sha = shaCache.get(file);
           if (!sha) {
             yield get(file);
             sha = shaCache.get(file);
           }
-
           yield requestAPI({
             method: "DELETE",
             path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file),
@@ -1301,9 +1109,8 @@ var dbToCloud = (function (exports) {
         } catch (err) {
           if (err.code === 404) {
             return;
-          } // FIXME: do we have to handle 422 errors?
-
-
+          }
+          // FIXME: do we have to handle 422 errors?
           throw err;
         }
       });
@@ -1311,13 +1118,12 @@ var dbToCloud = (function (exports) {
     }
   }
 
-  const _excluded$1 = ["path", "body"];
-
+  var _excluded$1 = ["path", "body"];
   function createDrive$3({
     getAccessToken,
     fetch = (typeof self !== "undefined" ? self : global).fetch
   }) {
-    const request = createRequest({
+    var request = createRequest({
       fetch,
       getAccessToken
     });
@@ -1329,12 +1135,10 @@ var dbToCloud = (function (exports) {
       delete: delete_,
       list
     };
-
     function requestRPC(_ref) {
-      let path = _ref.path,
-          body = _ref.body,
-          args = _objectWithoutProperties(_ref, _excluded$1);
-
+      var path = _ref.path,
+        body = _ref.body,
+        args = _objectWithoutProperties(_ref, _excluded$1);
       return request(_objectSpread2({
         method: "POST",
         path: "https://api.dropboxapi.com/2/".concat(path),
@@ -1342,39 +1146,33 @@ var dbToCloud = (function (exports) {
         body: JSON.stringify(body)
       }, args));
     }
-
     function list(_x) {
       return _list.apply(this, arguments);
     }
-
     function _list() {
       _list = _asyncToGenerator(function* (file) {
-        const names = [];
-        let result = yield requestRPC({
+        var names = [];
+        var result = yield requestRPC({
           path: "files/list_folder",
           body: {
             path: "/".concat(file)
           }
         });
-
         var _iterator = _createForOfIteratorHelper(result.entries),
-            _step;
-
+          _step;
         try {
           for (_iterator.s(); !(_step = _iterator.n()).done;) {
-            const entry = _step.value;
-            names.push(entry.name);
+            var _entry = _step.value;
+            names.push(_entry.name);
           }
         } catch (err) {
           _iterator.e(err);
         } finally {
           _iterator.f();
         }
-
         if (!result.has_more) {
           return names;
         }
-
         while (result.has_more) {
           result = yield requestRPC({
             path: "files/list_folder/continue",
@@ -1382,13 +1180,11 @@ var dbToCloud = (function (exports) {
               cursor: result.cursor
             }
           });
-
           var _iterator2 = _createForOfIteratorHelper(result.entries),
-              _step2;
-
+            _step2;
           try {
             for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
-              const entry = _step2.value;
+              var entry = _step2.value;
               names.push(entry.name);
             }
           } catch (err) {
@@ -1397,28 +1193,23 @@ var dbToCloud = (function (exports) {
             _iterator2.f();
           }
         }
-
         return names;
       });
       return _list.apply(this, arguments);
     }
-
     function stringifyParams(obj) {
-      const params = new URLSearchParams();
+      var params = new URLSearchParams();
       params.set("arg", JSON.stringify(obj));
       return params.toString();
     }
-
     function get(_x2) {
       return _get.apply(this, arguments);
     }
-
     function _get() {
       _get = _asyncToGenerator(function* (file) {
-        const params = {
+        var params = {
           path: "/".concat(file)
         };
-
         try {
           return yield request({
             path: "https://content.dropboxapi.com/2/files/download?".concat(stringifyParams(params)),
@@ -1428,20 +1219,17 @@ var dbToCloud = (function (exports) {
           if (err.code === 409 && err.message.includes("not_found")) {
             err.code = "ENOENT";
           }
-
           throw err;
         }
       });
       return _get.apply(this, arguments);
     }
-
     function put(_x3, _x4) {
       return _put.apply(this, arguments);
     }
-
     function _put() {
       _put = _asyncToGenerator(function* (file, data, mode = "overwrite") {
-        const params = {
+        var params = {
           path: "/".concat(file),
           mode,
           autorename: false,
@@ -1456,11 +1244,9 @@ var dbToCloud = (function (exports) {
       });
       return _put.apply(this, arguments);
     }
-
     function post(_x5, _x6) {
       return _post.apply(this, arguments);
     }
-
     function _post() {
       _post = _asyncToGenerator(function* (file, data) {
         try {
@@ -1469,17 +1255,14 @@ var dbToCloud = (function (exports) {
           if (err.code === 409 && err.message.includes("conflict")) {
             err.code = "EEXIST";
           }
-
           throw err;
         }
       });
       return _post.apply(this, arguments);
     }
-
     function delete_(_x7) {
       return _delete_.apply(this, arguments);
     }
-
     function _delete_() {
       _delete_ = _asyncToGenerator(function* (file) {
         try {
@@ -1493,7 +1276,6 @@ var dbToCloud = (function (exports) {
           if (err.code === 409 && err.message.includes("not_found")) {
             return;
           }
-
           throw err;
         }
       });
@@ -1505,7 +1287,7 @@ var dbToCloud = (function (exports) {
     getAccessToken,
     fetch = (typeof self !== "undefined" ? self : global).fetch
   }) {
-    const request = createRequest({
+    var request = createRequest({
       fetch,
       getAccessToken
     });
@@ -1517,11 +1299,9 @@ var dbToCloud = (function (exports) {
       delete: delete_,
       list
     };
-
     function query(_x) {
       return _query.apply(this, arguments);
     }
-
     function _query() {
       _query = _asyncToGenerator(function* (args) {
         args.path = "https://graph.microsoft.com/v1.0/me/drive/special/approot".concat(args.path);
@@ -1529,38 +1309,31 @@ var dbToCloud = (function (exports) {
       });
       return _query.apply(this, arguments);
     }
-
     function list(_x2) {
       return _list.apply(this, arguments);
     }
-
     function _list() {
       _list = _asyncToGenerator(function* (file) {
         if (file) {
           file = ":/".concat(file, ":");
         }
-
-        let result = yield query({
+        var result = yield query({
           path: "".concat(file, "/children?select=name")
         });
-        let files = result.value.map(i => i.name);
-
+        var files = result.value.map(i => i.name);
         while (result["@odata.nextLink"]) {
           result = yield request({
             path: result["@odata.nextLink"]
           });
           files = files.concat(result.value.map(i => i.name));
         }
-
         return files;
       });
       return _list.apply(this, arguments);
     }
-
     function get(_x3) {
       return _get.apply(this, arguments);
     }
-
     function _get() {
       _get = _asyncToGenerator(function* (file) {
         return yield query({
@@ -1570,11 +1343,9 @@ var dbToCloud = (function (exports) {
       });
       return _get.apply(this, arguments);
     }
-
     function put(_x4, _x5) {
       return _put.apply(this, arguments);
     }
-
     function _put() {
       _put = _asyncToGenerator(function* (file, data) {
         yield query({
@@ -1588,11 +1359,9 @@ var dbToCloud = (function (exports) {
       });
       return _put.apply(this, arguments);
     }
-
     function post(_x6, _x7) {
       return _post.apply(this, arguments);
     }
-
     function _post() {
       _post = _asyncToGenerator(function* (file, data) {
         try {
@@ -1608,17 +1377,14 @@ var dbToCloud = (function (exports) {
           if (err.code === 409 && err.message.includes("nameAlreadyExists")) {
             err.code = "EEXIST";
           }
-
           throw err;
         }
       });
       return _post.apply(this, arguments);
     }
-
     function delete_(_x8) {
       return _delete_.apply(this, arguments);
     }
-
     function _delete_() {
       _delete_ = _asyncToGenerator(function* (file) {
         try {
@@ -1630,7 +1396,6 @@ var dbToCloud = (function (exports) {
           if (err.code === 404) {
             return;
           }
-
           throw err;
         }
       });
@@ -1644,12 +1409,12 @@ var dbToCloud = (function (exports) {
     FormData = (typeof self !== "undefined" ? self : global).FormData,
     Blob = (typeof self !== "undefined" ? self : global).Blob
   }) {
-    const request = createRequest({
+    var request = createRequest({
       fetch,
       getAccessToken
     });
-    const fileMetaCache = new Map();
-    let lockRev;
+    var fileMetaCache = new Map();
+    var lockRev;
     return {
       name: "google",
       get,
@@ -1662,11 +1427,9 @@ var dbToCloud = (function (exports) {
       releaseLock,
       fileMetaCache
     };
-
     function revDelete(_x, _x2) {
       return _revDelete.apply(this, arguments);
     }
-
     function _revDelete() {
       _revDelete = _asyncToGenerator(function* (fileId, revId) {
         yield request({
@@ -1676,77 +1439,64 @@ var dbToCloud = (function (exports) {
       });
       return _revDelete.apply(this, arguments);
     }
-
     function acquireLock(_x3) {
       return _acquireLock.apply(this, arguments);
     }
-
     function _acquireLock() {
       _acquireLock = _asyncToGenerator(function* (expire) {
-        const lock = fileMetaCache.get("lock.json");
-
-        const _yield$queryPatch = yield queryPatch(lock.id, JSON.stringify({
-          expire: Date.now() + expire * 60 * 1000
-        })),
-              headRevisionId = _yield$queryPatch.headRevisionId;
-
-        const result = yield request({
+        var lock = fileMetaCache.get("lock.json");
+        var _yield$queryPatch = yield queryPatch(lock.id, JSON.stringify({
+            expire: Date.now() + expire * 60 * 1000
+          }), {
+            keepRevisionForever: true
+          }),
+          headRevisionId = _yield$queryPatch.headRevisionId;
+        var result = yield request({
           path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions?fields=revisions(id)")
         });
-
-        for (let i = 1; i < result.revisions.length; i++) {
-          const revId = result.revisions[i].id;
-
+        for (var i = 1; i < result.revisions.length; i++) {
+          var revId = result.revisions[i].id;
           if (revId === headRevisionId) {
             // success
             lockRev = headRevisionId;
             return;
           }
-
-          const rev = JSON.parse(yield request({
+          var rev = JSON.parse(yield request({
             path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions/").concat(revId, "?alt=media")
           }));
-
           if (rev.expire > Date.now()) {
             // failed, delete the lock
             yield revDelete(lock.id, headRevisionId);
             throw new LockError(rev.expire);
-          } // delete outdated lock
-
-
+          }
+          // delete outdated lock
           yield revDelete(lock.id, revId);
         }
-
         throw new Error("cannot find lock revision");
       });
       return _acquireLock.apply(this, arguments);
     }
-
     function releaseLock() {
       return _releaseLock.apply(this, arguments);
     }
-
     function _releaseLock() {
       _releaseLock = _asyncToGenerator(function* () {
-        const lock = fileMetaCache.get("lock.json");
+        var lock = fileMetaCache.get("lock.json");
         yield revDelete(lock.id, lockRev);
         lockRev = null;
       });
       return _releaseLock.apply(this, arguments);
     }
-
     function queryList(_x4, _x5) {
       return _queryList.apply(this, arguments);
     }
-
     function _queryList() {
       _queryList = _asyncToGenerator(function* (path, onPage) {
         path = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=nextPageToken,files(id,name,headRevisionId)" + (path ? "&" + path : "");
-        let result = yield request({
+        var result = yield request({
           path
         });
         onPage(result);
-
         while (result.nextPageToken) {
           result = yield request({
             path: "".concat(path, "&pageToken=").concat(result.nextPageToken)
@@ -1756,16 +1506,18 @@ var dbToCloud = (function (exports) {
       });
       return _queryList.apply(this, arguments);
     }
-
-    function queryPatch(_x6, _x7) {
+    function queryPatch(_x6, _x7, _x8) {
       return _queryPatch.apply(this, arguments);
     }
-
     function _queryPatch() {
-      _queryPatch = _asyncToGenerator(function* (id, text) {
+      _queryPatch = _asyncToGenerator(function* (id, text, query) {
+        var path = "https://www.googleapis.com/upload/drive/v3/files/".concat(id, "?uploadType=media&fields=headRevisionId");
+        if (query) {
+          path += "&".concat(new URLSearchParams(query).toString());
+        }
         return yield request({
           method: "PATCH",
-          path: "https://www.googleapis.com/upload/drive/v3/files/".concat(id, "?uploadType=media&fields=headRevisionId"),
+          path,
           headers: {
             "Content-Type": "text/plain"
           },
@@ -1774,24 +1526,20 @@ var dbToCloud = (function (exports) {
       });
       return _queryPatch.apply(this, arguments);
     }
-
-    function updateMeta(_x8) {
+    function updateMeta(_x9) {
       return _updateMeta.apply(this, arguments);
     }
-
     function _updateMeta() {
       _updateMeta = _asyncToGenerator(function* (query) {
         if (query) {
           query = "q=".concat(encodeURIComponent(query));
         }
-
         yield queryList(query, result => {
           var _iterator = _createForOfIteratorHelper(result.files),
-              _step;
-
+            _step;
           try {
             for (_iterator.s(); !(_step = _iterator.n()).done;) {
-              const file = _step.value;
+              var file = _step.value;
               fileMetaCache.set(file.name, file);
             }
           } catch (err) {
@@ -1803,30 +1551,24 @@ var dbToCloud = (function (exports) {
       });
       return _updateMeta.apply(this, arguments);
     }
-
     function init() {
       return _init.apply(this, arguments);
     }
-
     function _init() {
       _init = _asyncToGenerator(function* () {
         yield updateMeta();
-
         if (!fileMetaCache.has("lock.json")) {
           yield post("lock.json", "{}");
         }
-
         if (!fileMetaCache.has("meta.json")) {
           yield post("meta.json", "{}");
         }
       });
       return _init.apply(this, arguments);
     }
-
-    function list(_x9) {
+    function list(_x0) {
       return _list.apply(this, arguments);
     }
-
     function _list() {
       _list = _asyncToGenerator(function* (file) {
         // FIXME: this only works if file is a single dir
@@ -1836,24 +1578,19 @@ var dbToCloud = (function (exports) {
       });
       return _list.apply(this, arguments);
     }
-
-    function get(_x10) {
+    function get(_x1) {
       return _get.apply(this, arguments);
     }
-
     function _get() {
       _get = _asyncToGenerator(function* (file) {
-        let meta = fileMetaCache.get(file);
-
+        var meta = fileMetaCache.get(file);
         if (!meta) {
           yield updateMeta("name = '".concat(file, "'"));
           meta = fileMetaCache.get(file);
-
           if (!meta) {
             throw new RequestError("metaCache doesn't contain ".concat(file), null, "ENOENT");
           }
         }
-
         try {
           return yield request({
             path: "https://www.googleapis.com/drive/v3/files/".concat(meta.id, "?alt=media")
@@ -1862,38 +1599,32 @@ var dbToCloud = (function (exports) {
           if (err.code === 404) {
             err.code = "ENOENT";
           }
-
           throw err;
         }
       });
       return _get.apply(this, arguments);
     }
-
-    function put(_x11, _x12) {
+    function put(_x10, _x11) {
       return _put.apply(this, arguments);
     }
-
     function _put() {
       _put = _asyncToGenerator(function* (file, data) {
         if (!fileMetaCache.has(file)) {
           return yield post(file, data);
         }
-
-        const meta = fileMetaCache.get(file);
-        const result = yield queryPatch(meta.id, data);
+        var meta = fileMetaCache.get(file);
+        var result = yield queryPatch(meta.id, data);
         meta.headRevisionId = result.headRevisionId;
       });
       return _put.apply(this, arguments);
     }
-
-    function post(_x13, _x14) {
+    function post(_x12, _x13) {
       return _post.apply(this, arguments);
     }
-
     function _post() {
       _post = _asyncToGenerator(function* (file, data) {
-        const body = new FormData();
-        const meta = {
+        var body = new FormData();
+        var meta = {
           name: file,
           parents: ["appDataFolder"]
         };
@@ -1903,7 +1634,7 @@ var dbToCloud = (function (exports) {
         body.append("media", new Blob([data], {
           type: "text/plain"
         }));
-        const result = yield request({
+        var result = yield request({
           method: "POST",
           path: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,headRevisionId",
           body
@@ -1912,19 +1643,15 @@ var dbToCloud = (function (exports) {
       });
       return _post.apply(this, arguments);
     }
-
-    function delete_(_x15) {
+    function delete_(_x14) {
       return _delete_.apply(this, arguments);
     }
-
     function _delete_() {
       _delete_ = _asyncToGenerator(function* (file) {
-        const meta = fileMetaCache.get(file);
-
+        var meta = fileMetaCache.get(file);
         if (!meta) {
           return;
         }
-
         try {
           yield request({
             method: "DELETE",
@@ -1934,7 +1661,6 @@ var dbToCloud = (function (exports) {
           if (err.code === 404) {
             return;
           }
-
           throw err;
         }
       });
@@ -1943,65 +1669,31 @@ var dbToCloud = (function (exports) {
   }
 
   function dirname(path) {
-    const dir = path.replace(/[/\\][^/\\]+\/?$/, "");
+    var dir = path.replace(/[/\\][^/\\]+\/?$/, "");
     if (dir === path) return ".";
     return dir;
   }
+  function basename(path) {
+    var match = path.match(/([^/\\]+)[/\\]?$/);
+    return match ? match[1] : path;
+  }
 
-  const _excluded = ["path"];
-
+  var _excluded = ["path"];
   function arrayify(o) {
     return Array.isArray(o) ? o : [o];
   }
-
-  function xmlToJSON(node) {
-    // FIXME: xmldom doesn't support children
-    const children = Array.prototype.filter.call(node.childNodes, i => i.nodeType === 1);
-
-    if (!children.length) {
-      return node.textContent;
-    }
-
-    const o = {};
-
-    var _iterator = _createForOfIteratorHelper(children),
-        _step;
-
-    try {
-      for (_iterator.s(); !(_step = _iterator.n()).done;) {
-        const c = _step.value;
-        const cResult = xmlToJSON(c);
-
-        if (!o[c.localName]) {
-          o[c.localName] = cResult;
-        } else if (!Array.isArray(o[c.localName])) {
-          const list = [o[c.localName]];
-          list.push(cResult);
-          o[c.localName] = list;
-        } else {
-          o[c.localName].push(cResult);
-        }
-      }
-    } catch (err) {
-      _iterator.e(err);
-    } finally {
-      _iterator.f();
-    }
-
-    return o;
-  }
-
   function createDrive({
     username,
     password,
     url,
     fetch = (typeof self !== "undefined" ? self : global).fetch,
-    DOMParser = (typeof self !== "undefined" ? self : global).DOMParser
+    DOMParser = (typeof self !== "undefined" ? self : global).DOMParser,
+    parseXML = createXMLParser(DOMParser)
   }) {
     if (!url.endsWith("/")) {
       url += "/";
     }
-    const request = createRequest({
+    var request = createRequest({
       fetch,
       username,
       password
@@ -2012,69 +1704,55 @@ var dbToCloud = (function (exports) {
       put,
       post,
       delete: delete_,
-      list // acquireLock,
+      list
+      // acquireLock,
       // releaseLock
-
     };
-
     function requestDAV(_x) {
       return _requestDAV.apply(this, arguments);
     }
-
     function _requestDAV() {
       _requestDAV = _asyncToGenerator(function* (_ref) {
-        let path = _ref.path,
-            args = _objectWithoutProperties(_ref, _excluded);
-
-        const text = yield request(_objectSpread2({
+        var path = _ref.path,
+          args = _objectWithoutProperties(_ref, _excluded);
+        var text = yield request(_objectSpread2({
           path: "".concat(url).concat(path)
         }, args));
         if (args.format || typeof text !== "string" || !text) return text;
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(text, "application/xml");
-        const result = xmlToJSON(xml);
-
+        var result = yield parseXML(text);
         if (result.error) {
           throw new Error("Failed requesting DAV at ".concat(url).concat(path, ": ").concat(JSON.stringify(result.error)));
         }
-
         if (result.multistatus) {
           result.multistatus.response = arrayify(result.multistatus.response);
-
-          var _iterator2 = _createForOfIteratorHelper(result.multistatus.response),
-              _step2;
-
+          var _iterator = _createForOfIteratorHelper(result.multistatus.response),
+            _step;
           try {
-            for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
-              const r = _step2.value;
-
+            for (_iterator.s(); !(_step = _iterator.n()).done;) {
+              var r = _step.value;
               if (r.error) {
                 throw new Error("Failed requesting DAV at ".concat(url).concat(path, ": ").concat(r.href, " ").concat(r.error));
               }
             }
           } catch (err) {
-            _iterator2.e(err);
+            _iterator.e(err);
           } finally {
-            _iterator2.f();
+            _iterator.f();
           }
         }
-
         return result;
       });
       return _requestDAV.apply(this, arguments);
     }
-
     function list(_x2) {
       return _list.apply(this, arguments);
     }
-
     function _list() {
       _list = _asyncToGenerator(function* (file) {
         if (!file.endsWith("/")) {
           file += "/";
         }
-
-        const result = yield requestDAV({
+        var result = yield requestDAV({
           method: "PROPFIND",
           path: file,
           contentType: "application/xml",
@@ -2083,39 +1761,34 @@ var dbToCloud = (function (exports) {
             "Depth": "1"
           }
         });
-        const files = [];
-
-        var _iterator3 = _createForOfIteratorHelper(arrayify(result.multistatus.response)),
-            _step3;
-
+        var files = [];
+        var _iterator2 = _createForOfIteratorHelper(arrayify(result.multistatus.response)),
+          _step2;
         try {
-          for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
-            const entry = _step3.value;
-
+          for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
+            var entry = _step2.value;
             if (arrayify(entry.propstat).some(s => s.prop.resourcetype && s.prop.resourcetype.collection !== undefined)) {
               continue;
             }
-
-            const base = "".concat(url).concat(file);
-            const absUrl = new URL(entry.href, base).href;
-            const name = absUrl.slice(base.length);
+            // FIXME: what is the proper way to get the filename from entry?
+            // NOTE: some servers may treat `@` and `%40` as the same path, we may have to normalize them here and there.
+            var base = "".concat(url).concat(file);
+            var absUrl = new URL(entry.href, base).href;
+            var name = basename(absUrl);
             files.push(name);
           }
         } catch (err) {
-          _iterator3.e(err);
+          _iterator2.e(err);
         } finally {
-          _iterator3.f();
+          _iterator2.f();
         }
-
         return files;
       });
       return _list.apply(this, arguments);
     }
-
     function get(_x3) {
       return _get.apply(this, arguments);
     }
-
     function _get() {
       _get = _asyncToGenerator(function* (file) {
         return yield requestDAV({
@@ -2126,11 +1799,9 @@ var dbToCloud = (function (exports) {
       });
       return _get.apply(this, arguments);
     }
-
     function put(_x4, _x5) {
       return _put.apply(this, arguments);
     }
-
     function _put() {
       _put = _asyncToGenerator(function* (file, data) {
         return yield withDir(dirname(file), () => requestDAV({
@@ -2142,11 +1813,9 @@ var dbToCloud = (function (exports) {
       });
       return _put.apply(this, arguments);
     }
-
     function withDir(_x6, _x7) {
       return _withDir.apply(this, arguments);
     }
-
     function _withDir() {
       _withDir = _asyncToGenerator(function* (dir, cb) {
         try {
@@ -2156,7 +1825,6 @@ var dbToCloud = (function (exports) {
             throw err;
           }
         }
-
         yield withDir(dirname(dir), () => requestDAV({
           method: "MKCOL",
           path: dir
@@ -2165,11 +1833,9 @@ var dbToCloud = (function (exports) {
       });
       return _withDir.apply(this, arguments);
     }
-
     function post(_x8, _x9) {
       return _post.apply(this, arguments);
     }
-
     function _post() {
       _post = _asyncToGenerator(function* (file, data) {
         try {
@@ -2187,14 +1853,12 @@ var dbToCloud = (function (exports) {
           if (err.code === 412) {
             err.code = "EEXIST";
           }
-
           throw err;
         }
       });
       return _post.apply(this, arguments);
     }
-
-    function delete_(_x10) {
+    function delete_(_x0) {
       return _delete_.apply(this, arguments);
     } // async function acquireLock(mins) {
     // const r = await requestDAV({
@@ -2222,8 +1886,6 @@ var dbToCloud = (function (exports) {
     // }
     // });
     // }
-
-
     function _delete_() {
       _delete_ = _asyncToGenerator(function* (file) {
         // FIXME: support deleting collections?
@@ -2259,5 +1921,5 @@ var dbToCloud = (function (exports) {
 
   return exports;
 
-}({}));
+})({});
 //# sourceMappingURL=db-to-cloud.js.map
