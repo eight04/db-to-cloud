@@ -384,11 +384,14 @@ webdav({
   password: String,
   url: String,
   fetch?,
-  DOMParser?
+  DOMParser?,
+  parseXML?: Function
 }) => CloudAdapter
 ```
 
 This adapter stores data to webdav.
+
+`DOMParser` is used to parse XML response. If it is not supplied, use the global variable. Or, you can also implement your own XML parser and pass it to `parseXML`. Checkout the source code to see how it works.
 
 User-defined cloud drive adapter
 --------------------------------
