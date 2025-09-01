@@ -17,7 +17,7 @@ async function getGoogleAccessToken() {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded'
     },
-    body: `client_id=${process.env.GOOGLE_APP_ID}&redirect_uri=http://localhost&code=${code}&grant_type=authorization_code&client_secret=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`
+    body: `client_id=${process.env.GOOGLE_APP_ID}&redirect_uri=http://localhost&code=${code}&grant_type=authorization_code&client_secret=${process.env.GOOGLE_APP_SECRET}`
   });
   const result = await res.json();
   await clipboardy.write(`GOOGLE_ACCESS_TOKEN=${result.access_token}\nGOOGLE_ACCESS_TOKEN_EXPIRE=${Date.now() + result.expires_in * 1000}`);
