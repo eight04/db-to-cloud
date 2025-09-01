@@ -1445,34 +1445,40 @@ var dbToCloud = (function (exports) {
     function _acquireLock() {
       _acquireLock = _asyncToGenerator(function* (expire) {
         var lock = fileMetaCache.get("lock.json");
+        // write the lock to the cloud
         var _yield$queryPatch = yield queryPatch(lock.id, JSON.stringify({
             expire: Date.now() + expire * 60 * 1000
           }), {
             keepRevisionForever: true
           }),
           headRevisionId = _yield$queryPatch.headRevisionId;
-        var result = yield request({
-          path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions?fields=revisions(id)")
-        });
-        for (var i = 1; i < result.revisions.length; i++) {
-          var revId = result.revisions[i].id;
-          if (revId === headRevisionId) {
-            // success
-            lockRev = headRevisionId;
-            return;
+        try {
+          var result = yield request({
+            path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions?fields=revisions(id)")
+          });
+          for (var i = 1; i < result.revisions.length; i++) {
+            var revId = result.revisions[i].id;
+            if (revId === headRevisionId) {
+              // success
+              lockRev = headRevisionId;
+              return;
+            }
+            var rev = JSON.parse(yield request({
+              path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions/").concat(revId, "?alt=media")
+            }));
+            if (rev.expire > Date.now()) {
+              // previous lock is still valid
+              throw new LockError(rev.expire);
+            }
+            // delete outdated lock
+            yield revDelete(lock.id, revId);
           }
-          var rev = JSON.parse(yield request({
-            path: "https://www.googleapis.com/drive/v3/files/".concat(lock.id, "/revisions/").concat(revId, "?alt=media")
-          }));
-          if (rev.expire > Date.now()) {
-            // failed, delete the lock
-            yield revDelete(lock.id, headRevisionId);
-            throw new LockError(rev.expire);
-          }
-          // delete outdated lock
-          yield revDelete(lock.id, revId);
+          throw new Error("cannot find lock revision");
+        } catch (err) {
+          // cleanup
+          yield revDelete(lock.id, headRevisionId);
+          throw err;
         }
-        throw new Error("cannot find lock revision");
       });
       return _acquireLock.apply(this, arguments);
     }
