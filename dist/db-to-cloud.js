@@ -1674,8 +1674,8 @@ var dbToCloud = (function (exports) {
     return dir;
   }
   function basename(path) {
-    var match = path.match(/([^/\\]+)[/\\]?$/);
-    return match ? match[1] : path;
+    var match = path.match(/([^/\\]+)[/\\]*$/);
+    return match ? match[1] : "";
   }
 
   var _excluded = ["path"];
