@@ -503,6 +503,12 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
+* 0.8.0 (Sep 1, 2025)
+
+  - Fix: keep lock revision forever in google.
+  - Fix: change the logic to parse item name in webdav.
+  - Add: parseXML option in webdav.
+
 * 0.7.0 (Dec 7, 2021)
 
   - Add: support webdav.
