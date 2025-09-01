@@ -503,6 +503,10 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
+* 0.8.1 (Sep 2, 2025)
+
+  - Fix: clean up properly when acquire lock failed in google.
+
 * 0.8.0 (Sep 1, 2025)
 
   - Fix: keep lock revision forever in google.
