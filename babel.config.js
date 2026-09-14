@@ -9,7 +9,6 @@ const presets = [
       // https://github.com/facebook/regenerator/issues/276
       include: ["transform-template-literals"],
       exclude: ["transform-regenerator"],
-      bugfixes: true,
     },
   ],
 ];

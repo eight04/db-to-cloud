@@ -37,7 +37,7 @@ var dbToCloud = (function (exports) {
   function _createForOfIteratorHelper(r, e) {
     var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"];
     if (!t) {
-      if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) {
+      if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e) {
         t && (r = t);
         var n = 0,
           F = function () {};
@@ -45,9 +45,9 @@ var dbToCloud = (function (exports) {
           s: F,
           n: function () {
             return n >= r.length ? {
-              done: !0
+              done: true
             } : {
-              done: !1,
+              done: false,
               value: r[n++]
             };
           },
@@ -60,8 +60,8 @@ var dbToCloud = (function (exports) {
       throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
     }
     var o,
-      a = !0,
-      u = !1;
+      a = true,
+      u = false;
     return {
       s: function () {
         t = t.call(r);
@@ -71,7 +71,7 @@ var dbToCloud = (function (exports) {
         return a = r.done, r;
       },
       e: function (r) {
-        u = !0, o = r;
+        u = true, o = r;
       },
       f: function () {
         try {
@@ -85,9 +85,9 @@ var dbToCloud = (function (exports) {
   function _defineProperty(e, r, t) {
     return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, {
       value: t,
-      enumerable: !0,
-      configurable: !0,
-      writable: !0
+      enumerable: true,
+      configurable: true,
+      writable: true
     }) : e[r] = t, e;
   }
   function _iterableToArrayLimit(r, l) {
@@ -98,15 +98,12 @@ var dbToCloud = (function (exports) {
         i,
         u,
         a = [],
-        f = !0,
-        o = !1;
+        f = true,
+        o = false;
       try {
-        if (i = (t = t.call(r)).next, 0 === l) {
-          if (Object(t) !== t) return;
-          f = !1;
-        } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0);
+        if (i = (t = t.call(r)).next, 0 === l) ; else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0);
       } catch (r) {
-        o = !0, n = r;
+        o = true, n = r;
       } finally {
         try {
           if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return;
@@ -133,7 +130,7 @@ var dbToCloud = (function (exports) {
   function _objectSpread2(e) {
     for (var r = 1; r < arguments.length; r++) {
       var t = null != arguments[r] ? arguments[r] : {};
-      r % 2 ? ownKeys(Object(t), !0).forEach(function (r) {
+      r % 2 ? ownKeys(Object(t), true).forEach(function (r) {
         _defineProperty(e, r, t[r]);
       }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) {
         Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
@@ -168,7 +165,7 @@ var dbToCloud = (function (exports) {
     if ("object" != typeof t || !t) return t;
     var e = t[Symbol.toPrimitive];
     if (void 0 !== e) {
-      var i = e.call(t, r || "default");
+      var i = e.call(t, r);
       if ("object" != typeof i) return i;
       throw new TypeError("@@toPrimitive must return a primitive value.");
     }
@@ -442,7 +439,9 @@ var dbToCloud = (function (exports) {
           if (Date.now() > data.expire) {
             // FIXME: this may delete a different lock created by other instances
             yield this.delete("lock.json");
-            throw new Error("Found expired lock, please try again");
+            throw new Error("Found expired lock, please try again", {
+              cause: err
+            });
           }
           throw new LockError(data.expire);
         }
@@ -764,7 +763,6 @@ var dbToCloud = (function (exports) {
         var wait = retryDelay;
         var lastErr;
         while (true) {
-          // eslint-disable-line no-constant-condition
           try {
             yield _drive2.acquireLock(lockExpire);
             break;
@@ -934,7 +932,6 @@ var dbToCloud = (function (exports) {
         }
         Object.assign(headers, _headers);
         while (true) {
-          // eslint-disable-line no-constant-condition
           // console.log("req", path, args, headers);
           var res = yield fetch(path, _objectSpread2({
             headers
@@ -1912,18 +1909,16 @@ var dbToCloud = (function (exports) {
 
   var index = /*#__PURE__*/Object.freeze({
     __proto__: null,
+    dropbox: createDrive$3,
     fsDrive: empty,
     github: createDrive$4,
-    dropbox: createDrive$3,
-    onedrive: createDrive$2,
     google: createDrive$1,
+    onedrive: createDrive$2,
     webdav: createDrive
   });
 
   exports.dbToCloud = dbToCloud;
   exports.drive = index;
-
-  Object.defineProperty(exports, '__esModule', { value: true });
 
   return exports;
 
