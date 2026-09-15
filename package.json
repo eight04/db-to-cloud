@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "lint": "eslint . --cache",
-    "test": "npm run lint && c8 --reporter=lcov mocha -b",
+    "test": "npm run lint && c8 --reporter=lcov node --test --test-isolation=none test/test.js",
     "preversion": "npm test",
     "version": "npm run build && git add .",
     "postversion": "git push --follow-tags && npm publish",
@@ -24,28 +24,31 @@
     "universal-base64": "^2.1.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.16.0",
-    "@babel/preset-env": "^7.16.4",
-    "@rollup/plugin-alias": "^3.1.8",
-    "@rollup/plugin-babel": "^5.3.0",
-    "@rollup/plugin-node-resolve": "^13.0.6",
-    "@xmldom/xmldom": "^0.7.5",
+    "@babel/core": "^8.0.5",
+    "@babel/preset-env": "^8.0.5",
+    "@eslint/js": "^10.0.1",
+    "@rollup/plugin-alias": "^6.0.0",
+    "@rollup/plugin-babel": "^7.1.0",
+    "@rollup/plugin-inject": "^5.0.5",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-terser": "^1.0.0",
+    "@xmldom/xmldom": "^0.9.12",
     "assert-set": "^0.1.0",
-    "c8": "^7.10.0",
-    "clipboardy": "^2.3.0",
-    "dotenv": "^10.0.0",
-    "eslint": "^8.4.1",
-    "form-data": "^4.0.0",
-    "make-fetch-happen": "^9.1.0",
-    "mocha": "^9.1.3",
-    "mocha-logger": "^1.0.7",
-    "rollup": "^2.60.2",
-    "rollup-plugin-cjs-es": "^1.0.1",
+    "babel-plugin-polyfill-corejs3": "^1.0.0",
+    "c8": "^12.0.0",
+    "clipboardy": "^5.3.2",
+    "core-js-pure": "^3.50.0",
+    "dotenv": "^17.4.2",
+    "eslint": "^10.10.0",
+    "form-data": "^4.0.6",
+    "globals": "^17.12.0",
+    "make-fetch-happen": "^16.0.1",
+    "rollup": "^4.63.3",
+    "rollup-plugin-cjs-es": "^3.0.0",
     "rollup-plugin-re": "^1.0.7",
-    "rollup-plugin-terser": "^7.0.2",
-    "sinon": "^12.0.1",
-    "tempdir-yaml": "^0.3.0",
-    "webdav-server": "^2.6.2"
+    "sinon": "^22.1.0",
+    "tempdir-yaml": "^0.4.0",
+    "webdav-server": "^2.6.3"
   },
   "repository": "eight04/db-to-cloud",
   "eslintIgnore": [
@@ -59,5 +62,9 @@
     "lib",
     "dist"
   ],
-  "unpkg": "dist/db-to-cloud.min.js"
+  "unpkg": "dist/db-to-cloud.min.js",
+  "overrides": {
+    "@babel/core": "^8.0.5"
+  },
+  "type": "commonjs"
 }

@@ -1,5 +1,5 @@
 const fetch = require("make-fetch-happen");
-const clipboardy = require("clipboardy");
+const clipboardy = require("clipboardy").default;
 
 const {question, FormData, DummyBlob} = require("../util");
 const {google} = require("../..").drive;

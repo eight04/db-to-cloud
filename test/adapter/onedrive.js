@@ -1,5 +1,5 @@
 const fetch = require("make-fetch-happen");
-const clipboardy = require("clipboardy");
+const clipboardy = require("clipboardy").default;
 
 const {question} = require("../util");
 const {onedrive} = require("../..").drive;
