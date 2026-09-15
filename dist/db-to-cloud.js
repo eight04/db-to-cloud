@@ -857,6 +857,8 @@ var dbToCloud = (function (exports) {
 
   var empty = () => {};
 
+  var globalThis$1 = typeof globalThis !== "undefined" ? globalThis : self;
+
   function percentToByte(p) {
     return String.fromCharCode(parseInt(p.slice(1), 16));
   }
@@ -971,7 +973,7 @@ var dbToCloud = (function (exports) {
     owner,
     repo,
     getAccessToken,
-    fetch = (typeof self !== "undefined" ? self : global).fetch
+    fetch = globalThis$1.fetch
   }) {
     var request = createRequest({
       fetch,
@@ -1118,7 +1120,7 @@ var dbToCloud = (function (exports) {
   var _excluded$1 = ["path", "body"];
   function createDrive$3({
     getAccessToken,
-    fetch = (typeof self !== "undefined" ? self : global).fetch
+    fetch = globalThis$1.fetch
   }) {
     var request = createRequest({
       fetch,
@@ -1282,7 +1284,7 @@ var dbToCloud = (function (exports) {
 
   function createDrive$2({
     getAccessToken,
-    fetch = (typeof self !== "undefined" ? self : global).fetch
+    fetch = globalThis$1.fetch
   }) {
     var request = createRequest({
       fetch,
@@ -1402,9 +1404,9 @@ var dbToCloud = (function (exports) {
 
   function createDrive$1({
     getAccessToken,
-    fetch = (typeof self !== "undefined" ? self : global).fetch,
-    FormData = (typeof self !== "undefined" ? self : global).FormData,
-    Blob = (typeof self !== "undefined" ? self : global).Blob
+    fetch = globalThis$1.fetch,
+    FormData = globalThis$1.FormData,
+    Blob = globalThis$1.Blob
   }) {
     var request = createRequest({
       fetch,
@@ -1689,8 +1691,8 @@ var dbToCloud = (function (exports) {
     username,
     password,
     url,
-    fetch = (typeof self !== "undefined" ? self : global).fetch,
-    DOMParser = (typeof self !== "undefined" ? self : global).DOMParser,
+    fetch = globalThis$1.fetch,
+    DOMParser = globalThis$1.DOMParser,
     parseXML = createXMLParser(DOMParser)
   }) {
     if (!url.endsWith("/")) {

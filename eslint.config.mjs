@@ -3,13 +3,12 @@ import globals from "globals";
 import { defineConfig, globalIgnores } from "eslint/config";
 
 export default defineConfig([
-  globalIgnores(["dist-extension/*", "build", "chrome", "dist", "coverage"]),
+  globalIgnores(["dist-extension/*", "build", "chrome", "dist", "coverage", "shim"]),
   {
     languageOptions: {
       globals: {
         // ...globals.browser,
         ...globals.node,
-        self: "readonly",
       }
     },
     plugins: {js},

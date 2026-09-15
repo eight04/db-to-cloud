@@ -12,5 +12,15 @@ const presets = [
     },
   ],
 ];
+// const plugins = [
+//   [
+//     // FIXME: corejs3 doesn't work well with esm
+//     // https://github.com/zloirock/core-js/issues/385
+//     "polyfill-corejs3",
+//     {
+//       method: "usage-pure",
+//     }
+//   ]
+// ]
 
 module.exports = { presets, targets };

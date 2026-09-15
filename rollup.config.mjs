@@ -2,8 +2,11 @@ import resolve from "@rollup/plugin-node-resolve";
 import cjs from "rollup-plugin-cjs-es";
 import alias from "@rollup/plugin-alias";
 import {babel} from "@rollup/plugin-babel";
+import inject from "@rollup/plugin-inject";
 import terser from "@rollup/plugin-terser";
 import re from "rollup-plugin-re";
+
+import {fileURLToPath} from "url";
 
 function config({output, plugins = []}) {
   return {
@@ -17,8 +20,8 @@ function config({output, plugins = []}) {
     plugins: [
       alias({
         entries: {
-          "./fs-drive": "./shim/empty.js",
-          "path": "./shim/path.mjs"
+          "./fs-drive": fileURLToPath(import.meta.resolve("./shim/empty.js")),
+          "path": fileURLToPath(import.meta.resolve("./shim/path.js")),
         }
       }),
       resolve({
@@ -35,6 +38,9 @@ function config({output, plugins = []}) {
       cjs({nested: true}),
       babel({
         babelHelpers: "bundled"
+      }),
+      inject({
+        globalThis: fileURLToPath(import.meta.resolve("./shim/globalThis.js"))
       }),
       ...plugins
     ]
