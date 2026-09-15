@@ -10,7 +10,10 @@ module.exports = {
     // github.com — uses `token` auth there since an OAuth app generally
     // can't be pre-registered against an arbitrary self-hosted instance.
     // GITHUB_CREATE_METHOD lets a Gitea/Forgejo run set createMethod: "post".
-    const apiBase = process.env.GITHUB_API_BASE;
+    // `|| undefined`: a blank .env line (`GITHUB_API_BASE=`) reads as "",
+    // which must be treated the same as unset here too, or this picks the
+    // wrong auth branch below for a plain github.com run.
+    const apiBase = process.env.GITHUB_API_BASE || undefined;
     const drive = github({
       owner: process.env.GITHUB_OWNER,
       repo: "_db_to_cloud_test",

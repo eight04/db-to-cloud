@@ -17,7 +17,7 @@ function makeFakeFetch(routes) {
     const key = `${method} ${url.pathname}${url.search}`;
     const body = init.body ? JSON.parse(init.body) : undefined;
     calls.push({url: path, method, body, headers: init.headers || {}, cache: init.cache});
-    const entry = routes[key] ?? routes[`${method} ${url.pathname}`];
+    const entry = routes[key] !== undefined ? routes[key] : routes[`${method} ${url.pathname}`];
     if (!entry) {
       throw new Error(`Unhandled fake request: ${key}\nKnown: ${Object.keys(routes).join(", ")}`);
     }
@@ -46,6 +46,42 @@ test("sends token as `Authorization: token <t>`, cache: no-store, against api.gi
   assert.equal(calls[0].url, "https://api.github.com/repos/alice/scripts/contents?ref=main");
   assert.equal(calls[0].headers["Authorization"], "token test-token");
   assert.equal(calls[0].cache, "no-store");
+});
+
+test("treats apiBase: \"\" the same as unset, not as a literal empty host", async () => {
+  // A blank `GITHUB_API_BASE=` line in .env comes through as "", not
+  // undefined — a destructuring default only fires on undefined, so this
+  // must be handled explicitly or every request loses its host entirely.
+  const {fetchImpl, calls} = makeFakeFetch({
+    "GET /repos/alice/scripts/contents": {status: 200, body: []}
+  });
+  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", apiBase: "", fetch: fetchImpl});
+  await drive.list("");
+  assert.equal(calls[0].url, "https://api.github.com/repos/alice/scripts/contents?ref=main");
+});
+
+test("treats branch: \"\" the same as unset (defaults to main), not an empty ?ref=", async () => {
+  // Same trap as apiBase — a settings-UI text field left blank sends "",
+  // which must not become `?ref=` with nothing after it.
+  const {fetchImpl, calls} = makeFakeFetch({
+    "GET /repos/alice/scripts/contents": {status: 200, body: []}
+  });
+  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", branch: "", fetch: fetchImpl});
+  await drive.list("");
+  assert.equal(calls[0].url, "https://api.github.com/repos/alice/scripts/contents?ref=main");
+});
+
+test("treats createMethod: \"\" the same as unset (defaults to put)", async () => {
+  const {fetchImpl, calls} = makeFakeFetch({
+    "GET /repos/alice/scripts/contents/new.user.js": {status: 404, body: {message: "Not Found"}},
+    "PUT /repos/alice/scripts/contents/new.user.js": {
+      status: 201,
+      body: {content: {name: "new.user.js", path: "new.user.js", sha: "newsha"}}
+    }
+  });
+  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", createMethod: "", fetch: fetchImpl});
+  await drive.put("new.user.js", "abc");
+  assert.ok(calls.some(c => c.method === "PUT"));
 });
 
 test("honors a custom apiBase (e.g. a self-hosted Gitea instance)", async () => {
