@@ -338,13 +338,39 @@ If `fetch` is not supplied, use global variable `fetch`.
 ```js
 github({
   getAccessToken: async () => token: String,
+  token?: String,
+  apiBase?: String,
   owner: String,
   repo: String,
+  branch?: String,
+  createMethod?: "put" | "post",
   fetch?: Function
 }) => CloudAdapter
 ```
 
-This adapter stores data to Github repository `owner/repo`.
+This adapter stores data to a repository `owner/repo` via the GitHub
+Contents API — also implemented by GitHub Enterprise Server, Gitea, and
+Forgejo, so pointing `apiBase` at one of those works too (default:
+`https://api.github.com`).
+
+Pass either `token` (a personal access token, sent as `Authorization: token
+<token>`) or `getAccessToken` (an OAuth access token, `Authorization: Bearer
+<token>`) for authentication. `token` takes priority when both are given.
+Self-hosted instances generally can't have an OAuth app pre-registered
+against them, so `token` is the only option there.
+
+`branch` defaults to `"main"`.
+
+`createMethod` controls which HTTP method creates a new file: GitHub accepts
+`"put"` (the default) for both create and update, but Gitea/Forgejo require
+`"post"` to create a file (their PUT needs an existing `sha`). Updating an
+existing file always uses PUT regardless of this setting.
+
+The repository must already exist — this adapter never creates it.
+
+Two API limits apply, inherited from the underlying endpoint: `list()`
+returns at most 1,000 entries per directory (not paginated), and `get()`
+can only read files up to 1 MB.
 
 If `fetch` is not supplied, use global variable `fetch`.
 
