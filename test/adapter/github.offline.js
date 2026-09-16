@@ -3,6 +3,10 @@
 // covers the real API (github.com by default, or a self-hosted instance via
 // GITHUB_API_BASE) and needs GITHUB_ACCESS_TOKEN/GITHUB_OWNER in .env.
 //
+// Per review, the sync engine is a black box to this adapter and vice
+// versa — these tests only check that the adapter hands `fetch` the right
+// request for given inputs, not internal call sequencing.
+//
 // Run with: node --test test/adapter/github.offline.js
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
@@ -16,7 +20,7 @@ function makeFakeFetch(routes) {
     const url = new URL(path);
     const key = `${method} ${url.pathname}${url.search}`;
     const body = init.body ? JSON.parse(init.body) : undefined;
-    calls.push({url: path, method, body, headers: init.headers || {}, cache: init.cache});
+    calls.push({url: path, method, body, headers: init.headers || {}});
     const entry = routes[key] !== undefined ? routes[key] : routes[`${method} ${url.pathname}`];
     if (!entry) {
       throw new Error(`Unhandled fake request: ${key}\nKnown: ${Object.keys(routes).join(", ")}`);
@@ -37,51 +41,37 @@ test("throws if owner/repo are missing", () => {
   assert.throws(() => createDrive({}), /owner and repo are required/);
 });
 
-test("sends token as `Authorization: token <t>`, cache: no-store, against api.github.com by default", async () => {
+test("sends Bearer auth by default, against api.github.com by default", async () => {
   const {fetchImpl, calls} = makeFakeFetch({
     "GET /repos/alice/scripts/contents": {status: 200, body: []}
   });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "test-token", fetch: fetchImpl});
+  const drive = createDrive({owner: "alice", repo: "scripts", getAccessToken: () => "plain-token", fetch: fetchImpl});
   await drive.list("");
-  assert.equal(calls[0].url, "https://api.github.com/repos/alice/scripts/contents?ref=main");
-  assert.equal(calls[0].headers["Authorization"], "token test-token");
-  assert.equal(calls[0].cache, "no-store");
+  assert.equal(calls[0].url, "https://api.github.com/repos/alice/scripts/contents");
+  assert.equal(calls[0].headers["Authorization"], "Bearer plain-token");
 });
 
-test("treats apiBase: \"\" the same as unset, not as a literal empty host", async () => {
-  // A blank `GITHUB_API_BASE=` line in .env comes through as "", not
-  // undefined — a destructuring default only fires on undefined, so this
-  // must be handled explicitly or every request loses its host entirely.
+test("getAccessToken returning {scheme, param} sends that scheme instead of Bearer", async () => {
   const {fetchImpl, calls} = makeFakeFetch({
     "GET /repos/alice/scripts/contents": {status: 200, body: []}
   });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", apiBase: "", fetch: fetchImpl});
+  const drive = createDrive({
+    owner: "alice",
+    repo: "scripts",
+    getAccessToken: () => ({scheme: "token", param: "pat-value"}),
+    fetch: fetchImpl
+  });
   await drive.list("");
-  assert.equal(calls[0].url, "https://api.github.com/repos/alice/scripts/contents?ref=main");
+  assert.equal(calls[0].headers["Authorization"], "token pat-value");
 });
 
-test("treats branch: \"\" the same as unset (defaults to main), not an empty ?ref=", async () => {
-  // Same trap as apiBase — a settings-UI text field left blank sends "",
-  // which must not become `?ref=` with nothing after it.
+test("apiBase: \"\" is treated the same as unset, not a literal empty host", async () => {
   const {fetchImpl, calls} = makeFakeFetch({
     "GET /repos/alice/scripts/contents": {status: 200, body: []}
   });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", branch: "", fetch: fetchImpl});
+  const drive = createDrive({owner: "alice", repo: "scripts", apiBase: "", fetch: fetchImpl});
   await drive.list("");
-  assert.equal(calls[0].url, "https://api.github.com/repos/alice/scripts/contents?ref=main");
-});
-
-test("treats createMethod: \"\" the same as unset (defaults to put)", async () => {
-  const {fetchImpl, calls} = makeFakeFetch({
-    "GET /repos/alice/scripts/contents/new.user.js": {status: 404, body: {message: "Not Found"}},
-    "PUT /repos/alice/scripts/contents/new.user.js": {
-      status: 201,
-      body: {content: {name: "new.user.js", path: "new.user.js", sha: "newsha"}}
-    }
-  });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", createMethod: "", fetch: fetchImpl});
-  await drive.put("new.user.js", "abc");
-  assert.ok(calls.some(c => c.method === "PUT"));
+  assert.equal(calls[0].url, "https://api.github.com/repos/alice/scripts/contents");
 });
 
 test("honors a custom apiBase (e.g. a self-hosted Gitea instance)", async () => {
@@ -91,160 +81,184 @@ test("honors a custom apiBase (e.g. a self-hosted Gitea instance)", async () => 
   const drive = createDrive({
     owner: "alice",
     repo: "scripts",
-    token: "t",
     apiBase: "https://code.example.org/api/v1",
     fetch: fetchImpl
   });
   await drive.list("");
-  assert.equal(calls[0].url, "https://code.example.org/api/v1/repos/alice/scripts/contents?ref=main");
+  assert.equal(calls[0].url, "https://code.example.org/api/v1/repos/alice/scripts/contents");
 });
 
-test("treats a 404 on an empty-but-existing repo as an empty listing, not an error", async () => {
+test("no branch set: no ?ref= on reads, no branch field on writes", async () => {
   const {fetchImpl, calls} = makeFakeFetch({
-    "GET /repos/alice/scripts/contents": {status: 404, body: {message: "Not Found"}},
-    "GET /repos/alice/scripts": {status: 200, body: {full_name: "alice/scripts"}}
-  });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", fetch: fetchImpl});
-  assert.deepEqual(await drive.list(""), []);
-  assert.ok(calls.some(c => c.url.endsWith("/repos/alice/scripts")));
-});
-
-test("throws a code: ENOREPO error when the repo itself does not exist", async () => {
-  const {fetchImpl} = makeFakeFetch({
-    "GET /repos/alice/scripts/contents": {status: 404, body: {message: "Not Found"}},
-    "GET /repos/alice/scripts": {status: 404, body: {message: "Not Found"}}
-  });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", fetch: fetchImpl});
-  await assert.rejects(() => drive.list(""), err => {
-    assert.equal(err.code, "ENOREPO");
-    return true;
-  });
-});
-
-test("put() creates via PUT without a sha when none exists yet (GitHub default)", async () => {
-  const {fetchImpl, calls} = makeFakeFetch({
-    "GET /repos/alice/scripts/contents/new.user.js": {status: 404, body: {message: "Not Found"}},
+    "GET /repos/alice/scripts/contents": {status: 200, body: []},
     "PUT /repos/alice/scripts/contents/new.user.js": {
       status: 201,
       body: {content: {name: "new.user.js", path: "new.user.js", sha: "newsha"}}
     }
   });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", fetch: fetchImpl});
-  await drive.put("new.user.js", "abc");
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await drive.list("");
+  assert.equal(calls[0].url, "https://api.github.com/repos/alice/scripts/contents");
+  await drive.post("new.user.js", "abc");
   const putCall = calls.find(c => c.method === "PUT");
-  assert.equal(putCall.body.sha, undefined);
+  assert.equal(putCall.url, "https://api.github.com/repos/alice/scripts/contents/new.user.js");
+  assert.equal(putCall.body.branch, undefined);
 });
 
-test("put() creates via POST when createMethod is 'post' (Gitea/Forgejo)", async () => {
+test("branch set: ?ref= on reads, branch field on writes", async () => {
   const {fetchImpl, calls} = makeFakeFetch({
-    "GET /repos/alice/scripts/contents/new.user.js": {status: 404, body: {message: "Not Found"}},
-    "POST /repos/alice/scripts/contents/new.user.js": {
+    "GET /repos/alice/scripts/contents?ref=dev": {status: 200, body: []},
+    "PUT /repos/alice/scripts/contents/new.user.js": {
       status: 201,
       body: {content: {name: "new.user.js", path: "new.user.js", sha: "newsha"}}
     }
   });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", createMethod: "post", fetch: fetchImpl});
-  await drive.put("new.user.js", "abc");
-  assert.ok(calls.some(c => c.method === "POST"));
-  assert.ok(!calls.some(c => c.method === "PUT"));
+  const drive = createDrive({owner: "alice", repo: "scripts", branch: "dev", fetch: fetchImpl});
+  await drive.list("");
+  assert.equal(calls[0].url, "https://api.github.com/repos/alice/scripts/contents?ref=dev");
+  await drive.post("new.user.js", "abc");
+  const putCall = calls.find(c => c.method === "PUT");
+  assert.equal(putCall.body.branch, "dev");
 });
 
-test("put() always uses PUT (with sha) to update an existing file, regardless of createMethod", async () => {
+test("put() with overwrite=true throws ENOSHA if the file was never list()ed/get()ed, without calling fetch", async () => {
+  const {fetchImpl, calls} = makeFakeFetch({});
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await assert.rejects(() => drive.put("untracked.user.js", "abc"), err => {
+    assert.equal(err.code, "ENOSHA");
+    return true;
+  });
+  assert.equal(calls.length, 0);
+});
+
+test("put() with overwrite=true uses the cached sha (from a prior list()) with no extra request", async () => {
   const {fetchImpl, calls} = makeFakeFetch({
-    "GET /repos/alice/scripts/contents/existing.user.js": {
-      status: 200,
-      body: {name: "existing.user.js", path: "existing.user.js", sha: "oldsha"}
-    },
+    "GET /repos/alice/scripts/contents": {status: 200, body: [
+      {name: "existing.user.js", path: "existing.user.js", sha: "cached-sha"}
+    ]},
     "PUT /repos/alice/scripts/contents/existing.user.js": {
       status: 200,
       body: {content: {name: "existing.user.js", path: "existing.user.js", sha: "newsha"}}
     }
   });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", createMethod: "post", fetch: fetchImpl});
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await drive.list("");
   await drive.put("existing.user.js", "abc");
+  assert.equal(calls.length, 2); // the list(), then the PUT — no extra sha-refresh GET
   const putCall = calls.find(c => c.method === "PUT");
-  assert.equal(putCall.body.sha, "oldsha");
+  assert.equal(putCall.body.sha, "cached-sha");
 });
 
-test("put() retries once on a stale-sha 409 conflict, re-reading a fresh sha and succeeding", async () => {
-  let getCount = 0;
-  let putCount = 0;
+test("put() only records the sha in its cache after a successful write", async () => {
+  const {fetchImpl} = makeFakeFetch({
+    "GET /repos/alice/scripts/contents": {status: 200, body: [
+      {name: "existing.user.js", path: "existing.user.js", sha: "cached-sha"}
+    ]},
+    "PUT /repos/alice/scripts/contents/existing.user.js": {status: 500, body: {message: "boom"}}
+  });
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await drive.list("");
+  await assert.rejects(() => drive.put("existing.user.js", "abc"));
+  // shaCache still holds the pre-write value, not something from the failed response
+  assert.equal(drive.shaCache.get("existing.user.js"), "cached-sha");
+});
+
+test("post() (create-only) needs no cached sha and creates via PUT with none", async () => {
   const {fetchImpl, calls} = makeFakeFetch({
-    "GET /repos/alice/scripts/contents/race.user.js": () => {
-      getCount += 1;
-      return {
-        status: 200,
-        body: {name: "race.user.js", path: "race.user.js", sha: getCount === 1 ? "stale-sha" : "fresh-sha"}
-      };
-    },
-    "PUT /repos/alice/scripts/contents/race.user.js": () => {
-      putCount += 1;
-      return putCount === 1
-        ? {status: 409, body: {message: "race.user.js does not match fresh-sha"}}
-        : {status: 200, body: {content: {name: "race.user.js", path: "race.user.js", sha: "newest-sha"}}};
+    "PUT /repos/alice/scripts/contents/new.user.js": {
+      status: 201,
+      body: {content: {name: "new.user.js", path: "new.user.js", sha: "newsha"}}
     }
   });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", fetch: fetchImpl});
-  await drive.put("race.user.js", "abc");
-  assert.equal(getCount, 2);
-  assert.equal(putCount, 2);
-  const putCalls = calls.filter(c => c.method === "PUT");
-  assert.equal(putCalls[0].body.sha, "stale-sha");
-  assert.equal(putCalls[1].body.sha, "fresh-sha");
-});
-
-test("put() surfaces a 409 that persists past the retry, rather than looping or swallowing it", async () => {
-  const {fetchImpl} = makeFakeFetch({
-    "GET /repos/alice/scripts/contents/stuck.user.js": {
-      status: 200,
-      body: {name: "stuck.user.js", path: "stuck.user.js", sha: "some-sha"}
-    },
-    "PUT /repos/alice/scripts/contents/stuck.user.js": {
-      status: 409,
-      body: {message: "stuck.user.js does not match some-sha"}
-    }
-  });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", fetch: fetchImpl});
-  await assert.rejects(() => drive.put("stuck.user.js", "abc"));
-});
-
-test("remove() retries once on a stale-sha 409 conflict", async () => {
-  let getCount = 0;
-  let delCount = 0;
-  const {fetchImpl} = makeFakeFetch({
-    "GET /repos/alice/scripts/contents/gone-race.user.js": () => {
-      getCount += 1;
-      return {
-        status: 200,
-        body: {name: "gone-race.user.js", path: "gone-race.user.js", sha: getCount === 1 ? "stale-sha" : "fresh-sha"}
-      };
-    },
-    "DELETE /repos/alice/scripts/contents/gone-race.user.js": () => {
-      delCount += 1;
-      return delCount === 1
-        ? {status: 409, body: {message: "gone-race.user.js does not match fresh-sha"}}
-        : {status: 200, body: {commit: {}}};
-    }
-  });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", fetch: fetchImpl});
-  await drive.delete("gone-race.user.js");
-  assert.equal(getCount, 2);
-  assert.equal(delCount, 2);
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await drive.post("new.user.js", "abc");
+  assert.equal(calls[0].method, "PUT");
+  assert.equal(calls[0].body.sha, undefined);
 });
 
 test("post() (create-only) reports code: EEXIST when the file already exists", async () => {
-  // post() never looks up a sha (overwrite: false), so it PUTs with none —
-  // GitHub rejects that with 422 "sha wasn't supplied" when the file is
-  // already there.
+  // GitHub rejects a PUT with no sha on an existing file with 422 "sha
+  // wasn't supplied". Gitea's exact conflict response for this case isn't
+  // independently verified, so both 422 and 409 are treated as EEXIST here.
   const {fetchImpl} = makeFakeFetch({
     "PUT /repos/alice/scripts/contents/taken.user.js": {
       status: 422,
       body: {message: "\"sha\" wasn't supplied"}
     }
   });
-  const drive = createDrive({owner: "alice", repo: "scripts", token: "t", fetch: fetchImpl});
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
   await assert.rejects(() => drive.post("taken.user.js", "abc"), err => {
     assert.equal(err.code, "EEXIST");
     return true;
   });
+});
+
+test("delete() uses the cached sha and clears it on success", async () => {
+  const {fetchImpl, calls} = makeFakeFetch({
+    "GET /repos/alice/scripts/contents": {status: 200, body: [
+      {name: "gone.user.js", path: "gone.user.js", sha: "cached-sha"}
+    ]},
+    "DELETE /repos/alice/scripts/contents/gone.user.js": {status: 200, body: {commit: {}}}
+  });
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await drive.list("");
+  await drive.delete("gone.user.js");
+  const delCall = calls.find(c => c.method === "DELETE");
+  assert.equal(delCall.body.sha, "cached-sha");
+  assert.equal(drive.shaCache.has("gone.user.js"), false);
+});
+
+test("delete() with no cached sha fetches it once first (debug convenience), not as a retry loop", async () => {
+  const {fetchImpl, calls} = makeFakeFetch({
+    "GET /repos/alice/scripts/contents/untracked.user.js": {
+      status: 200,
+      body: {name: "untracked.user.js", path: "untracked.user.js", sha: "fetched-sha", content: "eA=="}
+    },
+    "DELETE /repos/alice/scripts/contents/untracked.user.js": {status: 200, body: {commit: {}}}
+  });
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await drive.delete("untracked.user.js");
+  assert.equal(calls.length, 2); // the one-time get(), then the DELETE
+  const delCall = calls.find(c => c.method === "DELETE");
+  assert.equal(delCall.body.sha, "fetched-sha");
+});
+
+test("delete() surfaces a 409 (stale sha) instead of retrying", async () => {
+  const {fetchImpl, calls} = makeFakeFetch({
+    "GET /repos/alice/scripts/contents": {status: 200, body: [
+      {name: "stuck.user.js", path: "stuck.user.js", sha: "cached-sha"}
+    ]},
+    "DELETE /repos/alice/scripts/contents/stuck.user.js": {status: 409, body: {message: "sha mismatch"}}
+  });
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await drive.list("");
+  await assert.rejects(() => drive.delete("stuck.user.js"));
+  assert.equal(calls.filter(c => c.method === "DELETE").length, 1); // no retry
+});
+
+test("delete() on an already-gone file (404) is a no-op", async () => {
+  const {fetchImpl} = makeFakeFetch({
+    "GET /repos/alice/scripts/contents/already-gone.user.js": {status: 404, body: {message: "Not Found"}}
+  });
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await drive.delete("already-gone.user.js"); // should not throw
+});
+
+test("list()/get() let a 404 propagate as-is, without guessing repo-vs-empty-path", async () => {
+  const {fetchImpl} = makeFakeFetch({
+    "GET /repos/alice/scripts/contents": {status: 404, body: {message: "Not Found"}}
+  });
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await assert.rejects(() => drive.list(""), err => {
+    assert.equal(err.code, 404);
+    return true;
+  });
+});
+
+test("checkRepoExists() is available for a caller that wants to disambiguate that 404 itself", async () => {
+  const {fetchImpl} = makeFakeFetch({
+    "GET /repos/alice/missing": {status: 404, body: {message: "Not Found"}}
+  });
+  const drive = createDrive({owner: "alice", repo: "missing", fetch: fetchImpl});
+  assert.equal(await drive.checkRepoExists(), false);
 });

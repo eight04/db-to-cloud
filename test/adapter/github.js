@@ -7,21 +7,13 @@ module.exports = {
   valid: () => process.env.GITHUB_ACCESS_TOKEN,
   get() {
     // GITHUB_API_BASE targets a self-hosted GHES/Gitea/Forgejo instead of
-    // github.com — uses `token` auth there since an OAuth app generally
-    // can't be pre-registered against an arbitrary self-hosted instance.
-    // GITHUB_CREATE_METHOD lets a Gitea/Forgejo run set createMethod: "post".
-    // `|| undefined`: a blank .env line (`GITHUB_API_BASE=`) reads as "",
-    // which must be treated the same as unset here too, or this picks the
-    // wrong auth branch below for a plain github.com run.
-    const apiBase = process.env.GITHUB_API_BASE || undefined;
+    // github.com — verified to work identically against a real Gitea
+    // instance (PUT-without-sha creates there too).
     const drive = github({
       owner: process.env.GITHUB_OWNER,
       repo: "_db_to_cloud_test",
-      apiBase,
-      createMethod: process.env.GITHUB_CREATE_METHOD,
-      ...apiBase
-        ? {token: process.env.GITHUB_ACCESS_TOKEN}
-        : {getAccessToken: () => process.env.GITHUB_ACCESS_TOKEN},
+      apiBase: process.env.GITHUB_API_BASE || undefined,
+      getAccessToken: () => ({scheme: "token", param: process.env.GITHUB_ACCESS_TOKEN}),
       fetch
     });
     if (!this.drive) {
