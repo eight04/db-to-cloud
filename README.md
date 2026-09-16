@@ -349,8 +349,7 @@ github({
 This adapter stores data to a repository `owner/repo` via the GitHub
 Contents API — also implemented by GitHub Enterprise Server, Gitea, and
 Forgejo, so pointing `apiBase` at one of those works too (default:
-`https://api.github.com`). Verified directly against a real Gitea instance,
-not just github.com.
+`https://api.github.com`).
 
 `getAccessToken` may return a plain string, sent as `Authorization: Bearer
 <token>`, or `{scheme, param}` for a different scheme — e.g. a GitHub/Gitea

@@ -1,11 +1,6 @@
 // Offline unit tests for the github drive, against a fake fetch — no live
-// account needed. The github.js integration test in this same directory
-// covers the real API (github.com by default, or a self-hosted instance via
-// GITHUB_API_BASE) and needs GITHUB_ACCESS_TOKEN/GITHUB_OWNER in .env.
-//
-// Per review, the sync engine is a black box to this adapter and vice
-// versa — these tests only check that the adapter hands `fetch` the right
-// request for given inputs, not internal call sequencing.
+// account needed. github.js in this same directory covers the real API and
+// needs GITHUB_ACCESS_TOKEN/GITHUB_OWNER (+ optional GITHUB_API_BASE) in .env.
 //
 // Run with: node --test test/adapter/github.offline.js
 const {test} = require("node:test");
@@ -152,7 +147,7 @@ test("put() with overwrite=true and no cached sha: if the create-attempt conflic
     }
   });
   const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
-  await drive.put("untracked.user.js", "abc"); // first sync ever: this path was never list()ed/get()ed
+  await drive.put("untracked.user.js", "abc");
   assert.equal(calls.length, 3); // failed PUT, GET for the real sha, retried PUT
   const puts = calls.filter(c => c.method === "PUT");
   assert.equal(puts[0].body.sha, undefined);
@@ -206,9 +201,7 @@ test("post() (create-only) needs no cached sha and creates via PUT with none", a
 });
 
 test("post() (create-only) reports code: EEXIST when the file already exists", async () => {
-  // GitHub rejects a PUT with no sha on an existing file with 422 "sha
-  // wasn't supplied". Gitea's exact conflict response for this case isn't
-  // independently verified, so both 422 and 409 are treated as EEXIST here.
+  // 422 "sha wasn't supplied" is GitHub's response; 409 is treated the same.
   const {fetchImpl} = makeFakeFetch({
     "PUT /repos/alice/scripts/contents/taken.user.js": {
       status: 422,
