@@ -121,14 +121,43 @@ test("branch set: ?ref= on reads, branch field on writes", async () => {
   assert.equal(putCall.body.branch, "dev");
 });
 
-test("put() with overwrite=true throws ENOSHA if the file was never list()ed/get()ed, without calling fetch", async () => {
-  const {fetchImpl, calls} = makeFakeFetch({});
-  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
-  await assert.rejects(() => drive.put("untracked.user.js", "abc"), err => {
-    assert.equal(err.code, "ENOSHA");
-    return true;
+test("put() with overwrite=true and no cached sha attempts a plain create first (no extra request)", async () => {
+  const {fetchImpl, calls} = makeFakeFetch({
+    "PUT /repos/alice/scripts/contents/untracked.user.js": {
+      status: 201,
+      body: {content: {name: "untracked.user.js", path: "untracked.user.js", sha: "newsha"}}
+    }
   });
-  assert.equal(calls.length, 0);
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await drive.put("untracked.user.js", "abc");
+  assert.equal(calls.length, 1); // just the PUT — no upfront GET
+  assert.equal(calls[0].body.sha, undefined);
+  assert.equal(drive.shaCache.get("untracked.user.js"), "newsha");
+});
+
+test("put() with overwrite=true and no cached sha: if the create-attempt conflicts, fetches the real sha once and retries", async () => {
+  const {fetchImpl, calls} = makeFakeFetch({
+    "PUT /repos/alice/scripts/contents/untracked.user.js": (() => {
+      let n = 0;
+      return () => {
+        n++;
+        return n === 1
+          ? {status: 422, body: {message: "\"sha\" wasn't supplied"}}
+          : {status: 200, body: {content: {name: "untracked.user.js", path: "untracked.user.js", sha: "updated-sha"}}};
+      };
+    })(),
+    "GET /repos/alice/scripts/contents/untracked.user.js": {
+      status: 200,
+      body: {name: "untracked.user.js", path: "untracked.user.js", sha: "real-sha", content: "eA=="}
+    }
+  });
+  const drive = createDrive({owner: "alice", repo: "scripts", fetch: fetchImpl});
+  await drive.put("untracked.user.js", "abc"); // first sync ever: this path was never list()ed/get()ed
+  assert.equal(calls.length, 3); // failed PUT, GET for the real sha, retried PUT
+  const puts = calls.filter(c => c.method === "PUT");
+  assert.equal(puts[0].body.sha, undefined);
+  assert.equal(puts[1].body.sha, "real-sha");
+  assert.equal(drive.shaCache.get("untracked.user.js"), "updated-sha");
 });
 
 test("put() with overwrite=true uses the cached sha (from a prior list()) with no extra request", async () => {
