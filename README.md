@@ -307,6 +307,14 @@ The library includes five cloud drive adapters.
 
 Various adapters require browser builtins (e.g. `fetch`, `FormData`, `Blob`). You can check how do we implement such features in Node.js by looking into the test file.
 
+### getAccessToken
+
+```js
+getAccessToken: async () => token: String | {scheme: String, param: String}
+```
+
+Every adapter that talks to a remote API (`dropbox`, `github`, `google`, `onedrive`) takes a `getAccessToken` option. A plain string is sent as `Authorization: Bearer <token>`. Returning `{scheme, param}` instead sends `Authorization: <scheme> <param>` — e.g. a GitHub/Gitea personal access token wants `{scheme: "token", param: <token>}`.
+
 ### fsDrive
 
 ```js
@@ -337,14 +345,32 @@ If `fetch` is not supplied, use global variable `fetch`.
 
 ```js
 github({
-  getAccessToken: async () => token: String,
+  getAccessToken: async () => token: String | {scheme: String, param: String},
+  apiBase?: String,
   owner: String,
   repo: String,
+  branch?: String,
   fetch?: Function
 }) => CloudAdapter
 ```
 
-This adapter stores data to Github repository `owner/repo`.
+This adapter stores data to a repository `owner/repo` via the GitHub
+Contents API — also implemented by GitHub Enterprise Server, Gitea, and
+Forgejo, so pointing `apiBase` at one of those works too (default:
+`https://api.github.com`).
+
+Self-hosted instances generally can't have an OAuth app pre-registered
+against them, so a static personal access token via `getAccessToken` (see
+above) is the practical option there.
+
+`branch` is unset by default, meaning "the repository's actual default
+branch" — this adapter never hardcodes a branch name.
+
+The repository must already exist — this adapter never creates it.
+
+Two API limits apply, inherited from the underlying endpoint: `list()`
+returns at most 1,000 entries per directory (not paginated), and `get()`
+can only read files up to 1 MB.
 
 If `fetch` is not supplied, use global variable `fetch`.
 

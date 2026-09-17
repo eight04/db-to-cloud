@@ -6,10 +6,12 @@ module.exports = {
   name: "github",
   valid: () => process.env.GITHUB_ACCESS_TOKEN,
   get() {
+    // GITHUB_API_BASE targets a self-hosted GHES/Gitea/Forgejo instead of github.com.
     const drive = github({
       owner: process.env.GITHUB_OWNER,
       repo: "_db_to_cloud_test",
-      getAccessToken: () => process.env.GITHUB_ACCESS_TOKEN,
+      apiBase: process.env.GITHUB_API_BASE || undefined,
+      getAccessToken: () => ({scheme: "token", param: process.env.GITHUB_ACCESS_TOKEN}),
       fetch
     });
     if (!this.drive) {
