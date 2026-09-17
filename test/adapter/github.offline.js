@@ -8,8 +8,6 @@ const assert = require("node:assert/strict");
 
 const createDrive = require("../../lib/drive/github");
 
-// t.mock.fn wraps the fake fetch for tracking/auto-restore; the routing by
-// method+path is still hand-rolled since node:test has no HTTP fake of its own.
 function makeFakeFetch(t, routes) {
   const calls = [];
   const fetchImpl = t.mock.fn(async (path, init = {}) => {
