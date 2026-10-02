@@ -1,10 +1,9 @@
 require("dotenv").config();
 
-const assert = require("assert");
+const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const sinon = require("sinon");
-const assertSet = require("assert-set");
 
 const ADAPTERS = require("./adapter");
 
@@ -37,103 +36,106 @@ async function suite(t, prepare) {
   
   assert(sync.isInit());
 
-  await t.test("started, try to modify db before the first sync", async () =>{
-    sync.delete(3, 1);
-    sync.put(1, 1);
+  t.log("started, try to modify db before the first sync")
+  
+  sync.delete(3, 1);
+  sync.put(1, 1);
 
-    await sync.syncNow();
-  });
+  await sync.syncNow();
 
-  await t.test("data should be written to drive", async () => {
-    const meta = await sync.drive().getMeta();
-    assert.equal(meta.lastChange, 3);
-    const {doc} = JSON.parse(await drive.get("docs/2.json"));
-    assert.deepStrictEqual(doc, data[2]);
-    const changes = JSON.parse(await drive.get("changes/0.json"));
-    assert.deepStrictEqual(changes, [
-      {
+  t.log("data should be written to drive")
+
+  const meta = await sync.drive().getMeta();
+  assert.equal(meta.lastChange, 3);
+  const {doc} = JSON.parse(await drive.get("docs/2.json"));
+  assert.deepStrictEqual(doc, data[2]);
+  const changes = JSON.parse(await drive.get("changes/0.json"));
+  assert.deepStrictEqual(changes, [
+    {
+      _id: 3,
+      _rev: 1,
+      action: "delete"
+    },
+    {
+      _id: 1,
+      _rev: 1,
+      action: "put"
+    },
+    {
+      _id: 2,
+      _rev: 1,
+      action: "put"
+    }
+  ]);
+  const args = options.onProgress.getCalls().map(c => c.args[0]);
+  assert.deepStrictEqual(args, [
+    {
+      phase: 'start'
+    },
+    {
+      phase: 'push',
+      total: 3,
+      loaded: 0,
+      change: {
         _id: 3,
         _rev: 1,
         action: "delete"
-      },
-      {
+      }
+    },
+    {
+      phase: 'push',
+      total: 3,
+      loaded: 1,
+      change: {
         _id: 1,
         _rev: 1,
         action: "put"
-      },
-      {
+      }
+    },
+    {
+      phase: 'push',
+      total: 3,
+      loaded: 2,
+      change: {
         _id: 2,
         _rev: 1,
         action: "put"
       }
-    ]);
-    const args = options.onProgress.getCalls().map(c => c.args[0]);
-    assert.deepStrictEqual(args, [
-      {
-        phase: 'start'
-      },
-      {
-        phase: 'push',
-        total: 3,
-        loaded: 0,
-        change: {
-          _id: 3,
-          _rev: 1,
-          action: "delete"
-        }
-      },
-      {
-        phase: 'push',
-        total: 3,
-        loaded: 1,
-        change: {
-          _id: 1,
-          _rev: 1,
-          action: "put"
-        }
-      },
-      {
-        phase: 'push',
-        total: 3,
-        loaded: 2,
-        change: {
-          _id: 2,
-          _rev: 1,
-          action: "put"
-        }
-      },
-      {
-        phase: "end"
-      }
-    ]);
-  });
+    },
+    {
+      phase: "end"
+    }
+  ]);
 
-  await t.test("getState/setState should be able to access drive name", async () => {
-    assert(drive.name);
-    assert.equal(options.getState.lastCall.args[0].name, drive.name);
-  })
+  t.log("getState/setState should be able to access drive name")
+
+  assert(drive.name);
+  assert.equal(options.getState.lastCall.args[0].name, drive.name);
 
   const {sync: sync2, data: data2, options: options2} = prepare({}, {retryMaxAttempts: 0});
-  await t.test("start and sync with the second instance", async () => {
-    await sync2.init();
-    await sync2.syncNow();
-    assert.deepStrictEqual(data2, data);
 
+  t.log("start and sync with the second instance");
+
+  await sync2.init();
+  await sync2.syncNow();
+  assert.deepStrictEqual(data2, data);
+
+  {
     const args = options2.onProgress.getCalls().map(c => c.args[0]);
     assert.equal(args.length, 4);
     assert.deepStrictEqual(args[0], {phase: 'start'});
     assert.deepStrictEqual(args[3], {phase: 'end'});
-    
+
     assert.equal(args[1].phase, 'pull');
     assert.equal(args[1].total, 2);
     assert.equal(args[1].loaded, 0);
-    
+
     assert.equal(args[2].phase, 'pull');
     assert.equal(args[2].total, 2);
     assert.equal(args[2].loaded, 1);
     
     // we don't care about the order
-    assertSet.equal([args[1].change, args[2].change], [
+    assert.deepEqual(new Set([args[1].change, args[2].change]), new Set([
       {
         // FIXME: https://github.com/eight04/db-to-cloud/issues/6
         _id: "1",
@@ -143,66 +145,66 @@ async function suite(t, prepare) {
         _id: "2",
         action: "put"
       }
-    ]);    
-  })
+    ]));    
+  }
 
-  await t.test("change should flow to other instances", async () => {
-    data2[3] = {
-      _id: 3,
-      _rev: 1,
-      baz: "bak"
-    };
-    sync2.put(3, 1);
-    data2[1]._rev = 2;
-    data2[1].foo = "foo";
-    sync2.put(1, 2);
-    delete data2[2];
-    sync2.delete(2, 2);
+  t.log("change should flow to other instances");
 
-    await sync2.syncNow();
-    await sync.syncNow();
+  data2[3] = {
+    _id: 3,
+    _rev: 1,
+    baz: "bak"
+  };
+  sync2.put(3, 1);
+  data2[1]._rev = 2;
+  data2[1].foo = "foo";
+  sync2.put(1, 2);
+  delete data2[2];
+  sync2.delete(2, 2);
 
-    assert.deepStrictEqual(data, data2);
-    assert.equal(data[1].foo, "foo");
-    assert.equal(data[2], undefined);
-    assert.equal(data[3].baz, "bak");
-  })
+  await sync2.syncNow();
+  await sync.syncNow();
+
+  assert.deepStrictEqual(data, data2);
+  assert.equal(data[1].foo, "foo");
+  assert.equal(data[2], undefined);
+  assert.equal(data[3].baz, "bak");
   
   // we only test this on local disk
   if (drive.name === "fs-drive") {
-    await t.test("100 changes", async () => {
-      for (let i = 0; i < 100; i++) {
-        data[4 + i] = {
-          _id: 4 + i,
-          _rev: 1,
-          value: Math.floor(Math.random() * 100)
-        };
-        sync.put(4 + i, 1);
-      }
+    t.log("100 changes");
 
-      await sync.syncNow();
-      await sync2.syncNow();
+    for (let i = 0; i < 100; i++) {
+      data[4 + i] = {
+        _id: 4 + i,
+        _rev: 1,
+        value: Math.floor(Math.random() * 100)
+      };
+      sync.put(4 + i, 1);
+    }
 
-      assert.deepStrictEqual(data2, data);
-    });
+    await sync.syncNow();
+    await sync2.syncNow();
+
+    assert.deepStrictEqual(data2, data);
   }
 
-  await t.test("cloud is locked while syncing", async () => {
-    options.fetchDelay = 3000;
+  t.log("cloud is locked while syncing");
 
-    data[1].foo = "not foo";
-    data[1]._rev++;
-    sync.put(1, data[1]._rev);
-    const p = sync.syncNow();
-    await delay(1500);
-    await assert.rejects(
-      () => sync2.syncNow(false),
-      {message: /the database is locked/i}
-    );
-    await p;
+  options.fetchDelay = 3000;
 
-    options.fetchDelay = 0;
-  });
+  data[1].foo = "not foo";
+  data[1]._rev++;
+  sync.put(1, data[1]._rev);
+  const p = sync.syncNow();
+  await delay(1500);
+  await assert.rejects(
+    () => sync2.syncNow(false),
+    {message: /the database is locked/i}
+  );
+  await p;
+
+  options.fetchDelay = 0;
 }
 
 const instances = [];
@@ -219,10 +221,11 @@ for (const adapter of ADAPTERS) {
       }
       const getDrive = adapter.get.bind(adapter);
       await suite(t, (...args) => prepare(getDrive, ...args));
+    } finally {
       if (adapter.after) {
+        // FIXME: can adapater.after throw?
         await adapter.after();
       }
-    } finally {
       for (const ctrl of instances) {
         await ctrl.uninit();
         assert(!ctrl.isInit());
