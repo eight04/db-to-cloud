@@ -332,7 +332,7 @@ The browser build doesn't include this adapter.
 
 ```js
 dropbox({
-  getAccessToken: async () => token: String,
+  getAccessToken: Function,
   fetch?: Function
 }) => CloudAdapter
 ```
@@ -345,7 +345,7 @@ If `fetch` is not supplied, use global variable `fetch`.
 
 ```js
 github({
-  getAccessToken: async () => token: String | {scheme: String, param: String},
+  getAccessToken: Function,
   apiBase?: String,
   owner: String,
   repo: String,
@@ -366,7 +366,7 @@ above) is the practical option there.
 `branch` is unset by default, meaning "the repository's actual default
 branch" — this adapter never hardcodes a branch name.
 
-The repository must already exist — this adapter never creates it.
+The repository and branch must already exist — this adapter never creates them.
 
 Two API limits apply, inherited from the underlying endpoint: `list()`
 returns at most 1,000 entries per directory (not paginated), and `get()`
@@ -378,7 +378,7 @@ If `fetch` is not supplied, use global variable `fetch`.
 
 ```js
 google({
-  getAccessToken: async () => token: String,
+  getAccessToken: Function,
   fetch?,
   FormData?,
   Blob?
@@ -393,7 +393,7 @@ If `fetch`/`FormData`/`Blob` is not supplied, use the global variable.
 
 ```js
 onedrive({
-  getAccessToken: async () => token: String,
+  getAccessToken: Function,
   fetch?
 }) => CloudAdapter
 ```
