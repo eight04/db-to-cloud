@@ -1,10 +1,9 @@
-/* eslint-env mocha */
 require("dotenv").config();
 
 const assert = require("assert");
+const test = require("node:test");
 
 const sinon = require("sinon");
-const logger = require("mocha-logger");
 const assertSet = require("assert-set");
 
 const ADAPTERS = require("./adapter");
@@ -17,7 +16,7 @@ function delay(time) {
   });
 }
 
-async function suite(prepare) {
+async function suite(t, prepare) {
   const data = {
     1: {
       _id: 1,
@@ -38,16 +37,14 @@ async function suite(prepare) {
   
   assert(sync.isInit());
 
-  logger.log("started, try to modify db before the first sync");
-  
-  sync.delete(3, 1);
-  sync.put(1, 1);
+  await t.test("started, try to modify db before the first sync", async () =>{
+    sync.delete(3, 1);
+    sync.put(1, 1);
 
-  await sync.syncNow();
+    await sync.syncNow();
+  });
 
-  logger.log("data should be written to drive");
-
-  {
+  await t.test("data should be written to drive", async () => {
     const meta = await sync.drive().getMeta();
     assert.equal(meta.lastChange, 3);
     const {doc} = JSON.parse(await drive.get("docs/2.json"));
@@ -109,20 +106,19 @@ async function suite(prepare) {
         phase: "end"
       }
     ]);
-  }
+  });
 
-  logger.log("getState/setState should be able to access drive name");
-
-  assert(drive.name);
-  assert.equal(options.getState.lastCall.args[0].name, drive.name);
-
-  logger.log("start and sync with the second instance");
+  await t.test("getState/setState should be able to access drive name", async () => {
+    assert(drive.name);
+    assert.equal(options.getState.lastCall.args[0].name, drive.name);
+  })
 
   const {sync: sync2, data: data2, options: options2} = prepare({}, {retryMaxAttempts: 0});
-  await sync2.init();
-  await sync2.syncNow();
-  assert.deepStrictEqual(data2, data);
-  {
+  await t.test("start and sync with the second instance", async () => {
+    await sync2.init();
+    await sync2.syncNow();
+    assert.deepStrictEqual(data2, data);
+
     const args = options2.onProgress.getCalls().map(c => c.args[0]);
     assert.equal(args.length, 4);
     assert.deepStrictEqual(args[0], {phase: 'start'});
@@ -148,143 +144,127 @@ async function suite(prepare) {
         action: "put"
       }
     ]);    
-  }
+  })
 
-  logger.log("change should flow to other instances");
+  await t.test("change should flow to other instances", async () => {
+    data2[3] = {
+      _id: 3,
+      _rev: 1,
+      baz: "bak"
+    };
+    sync2.put(3, 1);
+    data2[1]._rev = 2;
+    data2[1].foo = "foo";
+    sync2.put(1, 2);
+    delete data2[2];
+    sync2.delete(2, 2);
 
-  data2[3] = {
-    _id: 3,
-    _rev: 1,
-    baz: "bak"
-  };
-  sync2.put(3, 1);
-  data2[1]._rev = 2;
-  data2[1].foo = "foo";
-  sync2.put(1, 2);
-  delete data2[2];
-  sync2.delete(2, 2);
+    await sync2.syncNow();
+    await sync.syncNow();
 
-  await sync2.syncNow();
-  await sync.syncNow();
-
-  assert.deepStrictEqual(data, data2);
-  assert.equal(data[1].foo, "foo");
-  assert.equal(data[2], undefined);
-  assert.equal(data[3].baz, "bak");
+    assert.deepStrictEqual(data, data2);
+    assert.equal(data[1].foo, "foo");
+    assert.equal(data[2], undefined);
+    assert.equal(data[3].baz, "bak");
+  })
   
   // we only test this on local disk
   if (drive.name === "fs-drive") {
-    logger.log("100 changes");
-
-    for (let i = 0; i < 100; i++) {
-      data[4 + i] = {
-        _id: 4 + i,
-        _rev: 1,
-        value: Math.floor(Math.random() * 100)
-      };
-      sync.put(4 + i, 1);
-    }
-
-    await sync.syncNow();
-    await sync2.syncNow();
-
-    assert.deepStrictEqual(data2, data);
-  }
-
-  logger.log("cloud is locked while syncing");
-
-  options.fetchDelay = 3000;
-
-  data[1].foo = "not foo";
-  data[1]._rev++;
-  sync.put(1, data[1]._rev);
-  const p = sync.syncNow();
-  await delay(1500);
-  await assert.rejects(
-    () => sync2.syncNow(false),
-    {message: /the database is locked/i}
-  );
-  await p;
-
-  options.fetchDelay = 0;
-}
-
-describe("functional", () => {
-  const instances = [];
-  
-  afterEach(async function () {
-    this.timeout(20 * 1000);
-    for (const ctrl of instances) {
-      await ctrl.uninit();
-      assert(!ctrl.isInit());
-    }
-    instances.length = 0;
-  });
-  
-  for (const adapter of ADAPTERS) {
-    describe(adapter.name, function() {
-      if (!adapter.valid()) {
-        logger.log(`invalid context, skip ${adapter.name}`);
-        return;
+    await t.test("100 changes", async () => {
+      for (let i = 0; i < 100; i++) {
+        data[4 + i] = {
+          _id: 4 + i,
+          _rev: 1,
+          value: Math.floor(Math.random() * 100)
+        };
+        sync.put(4 + i, 1);
       }
-      
-      before(async function() {
-        this.timeout(5 * 60 * 1000);
-        if (adapter.before) {
-          await adapter.before();
-        }
-      });
-      
-      after(async function() {
-        this.timeout(5 * 60 * 1000);
-        if (adapter.after) {
-          await adapter.after();
-        }
-      });
-      
-      it("run suite", async function() {
-        this.timeout(5 * 60 * 1000);
-        const getDrive = adapter.get.bind(adapter);
-        await suite((...args) => prepare(getDrive, ...args));
-      });
+
+      await sync.syncNow();
+      await sync2.syncNow();
+
+      assert.deepStrictEqual(data2, data);
     });
   }
+
+  await t.test("cloud is locked while syncing", async () => {
+    options.fetchDelay = 3000;
+
+    data[1].foo = "not foo";
+    data[1]._rev++;
+    sync.put(1, data[1]._rev);
+    const p = sync.syncNow();
+    await delay(1500);
+    await assert.rejects(
+      () => sync2.syncNow(false),
+      {message: /the database is locked/i}
+    );
+    await p;
+
+    options.fetchDelay = 0;
+  });
+}
+
+const instances = [];
   
-  function prepare(getDrive, data = {}, driveOptions) {
-    const compareRevision = sinon.spy((a, b) => a - b);
-    const options = {
-      fetchDelay: 0,
-      onGet: sinon.spy(async (_id) => {
-        await delay(options.fetchDelay);
-        return data[_id];
-      }),
-      onPut: sinon.spy(doc => {
-        if (!data[doc._id] || compareRevision(data[doc._id]._rev, doc._rev) < 0) {
-          data[doc._id] = doc;
-        }
-      }),
-      onDelete: sinon.spy((_id, _rev) => {
-        if (data[_id] && compareRevision(data[_id]._rev, _rev) < 0) {
-          delete data[_id];
-        }
-      }),
-      onWarn: sinon.spy(),
-      onFirstSync: sinon.spy(() => {
-        for (const doc of Object.values(data)) {
-          // eslint-disable-next-line no-use-before-define
-          sync.put(doc._id, doc._rev);
-        }
-      }),
-      onProgress: sinon.spy(),
-      compareRevision,
-      getState: sinon.spy(),
-      setState: sinon.spy(),
-      ...driveOptions
-    };
-    const sync = dbToCloud(options);
-    const drive = getDrive();
-    sync.use(drive);
-    instances.push(sync);
-    return {sync, options, data, drive};
-  }
-});
+for (const adapter of ADAPTERS) {
+  test(adapter.name, async t => {
+    if (!adapter.valid()) {
+      t.skip(`invalid context, skip ${adapter.name}`);
+      return;
+    }
+    try {
+      if (adapter.before) {
+        await adapter.before();
+      }
+      const getDrive = adapter.get.bind(adapter);
+      await suite(t, (...args) => prepare(getDrive, ...args));
+      if (adapter.after) {
+        await adapter.after();
+      }
+    } finally {
+      for (const ctrl of instances) {
+        await ctrl.uninit();
+        assert(!ctrl.isInit());
+      }
+      instances.length = 0;
+    }
+  });
+}
+  
+function prepare(getDrive, data = {}, driveOptions) {
+  const compareRevision = sinon.spy((a, b) => a - b);
+  const options = {
+    fetchDelay: 0,
+    onGet: sinon.spy(async (_id) => {
+      await delay(options.fetchDelay);
+      return data[_id];
+    }),
+    onPut: sinon.spy(doc => {
+      if (!data[doc._id] || compareRevision(data[doc._id]._rev, doc._rev) < 0) {
+        data[doc._id] = doc;
+      }
+    }),
+    onDelete: sinon.spy((_id, _rev) => {
+      if (data[_id] && compareRevision(data[_id]._rev, _rev) < 0) {
+        delete data[_id];
+      }
+    }),
+    onWarn: sinon.spy(),
+    onFirstSync: sinon.spy(() => {
+      for (const doc of Object.values(data)) {
+        sync.put(doc._id, doc._rev);
+      }
+    }),
+    onProgress: sinon.spy(),
+    compareRevision,
+    getState: sinon.spy(),
+    setState: sinon.spy(),
+    ...driveOptions
+  };
+  const sync = dbToCloud(options);
+  const drive = getDrive();
+  sync.use(drive);
+  instances.push(sync);
+  return {sync, options, data, drive};
+}
