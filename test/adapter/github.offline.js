@@ -80,7 +80,7 @@ test("branch set: ?ref= on reads, branch field on writes", async t => {
 // Covers the first-sync case: db-to-cloud's syncPush() calls put() on
 // brand-new docs/*.json before list()/get() ever ran, so shaCache starts
 // empty — this is what "no cached sha means create" is for.
-test("put() with overwrite=true and no cached sha does a plain create (no sha in body)", async t => {
+test("put() should not throw when no cached sha", async t => {
   const fetch = t.mock.fn(() =>
     jsonResponse({content: {name: "untracked.user.js", path: "untracked.user.js", sha: "newsha"}}, 201));
   const drive = createDrive({owner: "alice", repo: "scripts", fetch});
@@ -91,7 +91,7 @@ test("put() with overwrite=true and no cached sha does a plain create (no sha in
   assert.equal(drive.shaCache.get("untracked.user.js"), "newsha");
 });
 
-test("put() with overwrite=true uses the cached sha (from a prior list()) with no extra request", async t => {
+test("put() sends the cached sha to the server", async t => {
   const responses = [
     jsonResponse([{name: "existing.user.js", path: "existing.user.js", sha: "cached-sha"}]),
     jsonResponse({content: {name: "existing.user.js", path: "existing.user.js", sha: "newsha"}})
