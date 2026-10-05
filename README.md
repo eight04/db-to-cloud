@@ -529,7 +529,7 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
-* 0.8.2 (Oct 5, 2026)
+* 0.9.0 (Oct 5, 2026)
 
   - Add: `apiBase`, `branch` options in github adapter.
 
