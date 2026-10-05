@@ -1,7 +1,7 @@
 db-to-cloud
 ===========
 
-[![Build Status](https://travis-ci.com/eight04/db-to-cloud.svg?branch=master)](https://travis-ci.com/eight04/db-to-cloud)
+[![test](https://github.com/eight04/db-to-cloud/actions/workflows/test.yml/badge.svg)](https://github.com/eight04/db-to-cloud/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/eight04/db-to-cloud/branch/master/graph/badge.svg)](https://codecov.io/gh/eight04/db-to-cloud)
 
 Synchronize your database with a cloud drive i.e. Dropbox, Google Drive, OneDrive, Github, etc.
