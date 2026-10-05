@@ -529,6 +529,10 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
+* 0.8.2 (Oct 5, 2026)
+
+  - Add: `apiBase`, `branch` options in github adapter.
+
 * 0.8.1 (Sep 2, 2025)
 
   - Fix: clean up properly when acquire lock failed in google.

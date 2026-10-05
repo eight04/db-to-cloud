@@ -924,7 +924,9 @@ var dbToCloud = (function (exports) {
           args = _objectWithoutProperties(_ref2, _excluded$2);
         var headers = {};
         if (getAccessToken) {
-          headers["Authorization"] = "Bearer ".concat(yield getAccessToken());
+          // A plain string means Bearer; {scheme, param} picks another scheme.
+          var token = yield getAccessToken();
+          headers["Authorization"] = typeof token === "string" ? "Bearer ".concat(token) : "".concat(token.scheme || "Bearer", " ").concat(token.param);
         }
         if (basicAuth) {
           headers["Authorization"] = basicAuth;
@@ -968,13 +970,23 @@ var dbToCloud = (function (exports) {
     }
   }
 
+  // Also covers GHES, Gitea, and Forgejo — same Contents API, so `apiBase`
+  // alone is enough to target any of them.
   function createDrive$4({
     userAgent = "db-to-cloud",
+    apiBase,
     owner,
     repo,
+    branch,
     getAccessToken,
     fetch = globalThis$1.fetch
   }) {
+    if (!owner || !repo) {
+      throw new Error("owner and repo are required");
+    }
+    apiBase = (apiBase || "https://api.github.com").replace(/\/+$/, "");
+    // Unset means the repo's default branch: omit ?ref= / branch entirely.
+    branch = branch || null;
     var request = createRequest({
       fetch,
       getAccessToken,
@@ -988,6 +1000,7 @@ var dbToCloud = (function (exports) {
       post,
       delete: delete_,
       list,
+      checkRepoExists,
       shaCache
     };
     function requestAPI(args) {
@@ -998,10 +1011,36 @@ var dbToCloud = (function (exports) {
         args.headers["User-Agent"] = userAgent;
       }
       if (!args.headers["Accept"]) {
-        args.headers["Accept"] = "application/vnd.github.v3+json";
+        // Plain JSON — Gitea/Forgejo don't honor GitHub's vnd.github.v3+json.
+        args.headers["Accept"] = "application/json";
       }
-      args.path = "https://api.github.com".concat(args.path);
+      args.path = "".concat(apiBase).concat(args.path);
       return request(args);
+    }
+    function contentsPath(file, ref = false) {
+      var encoded = file.split("/").filter(Boolean).map(encodeURIComponent).join("/");
+      var path = "/repos/".concat(owner, "/").concat(repo, "/contents").concat(encoded ? "/".concat(encoded) : "");
+      return ref && branch ? "".concat(path, "?ref=").concat(encodeURIComponent(branch)) : path;
+    }
+
+    // A 404 from contents is ambiguous (missing repo vs. empty path).
+    // list()/get() don't call this — they let a plain 404 propagate.
+    function checkRepoExists() {
+      return _checkRepoExists.apply(this, arguments);
+    }
+    function _checkRepoExists() {
+      _checkRepoExists = _asyncToGenerator(function* () {
+        try {
+          yield requestAPI({
+            path: "/repos/".concat(owner, "/").concat(repo)
+          });
+          return true;
+        } catch (err) {
+          if (err.code === 404) return false;
+          throw err;
+        }
+      });
+      return _checkRepoExists.apply(this, arguments);
     }
     function list(_x) {
       return _list.apply(this, arguments);
@@ -1010,7 +1049,7 @@ var dbToCloud = (function (exports) {
       _list = _asyncToGenerator(function* (file) {
         // FIXME: This API has an upper limit of 1,000 files for a directory. If you need to retrieve more files, use the Git Trees API.
         var result = yield requestAPI({
-          path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file)
+          path: contentsPath(file, true)
         });
         var names = [];
         var _iterator = _createForOfIteratorHelper(result),
@@ -1037,7 +1076,7 @@ var dbToCloud = (function (exports) {
       _get = _asyncToGenerator(function* (file) {
         // FIXME: This API supports files up to 1 megabyte in size.
         var result = yield requestAPI({
-          path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file)
+          path: contentsPath(file, true)
         });
         shaCache.set(result.path, result.sha);
         return decode(result.content);
@@ -1049,37 +1088,33 @@ var dbToCloud = (function (exports) {
     }
     function _put() {
       _put = _asyncToGenerator(function* (file, data, overwrite = true) {
+        // Uses the cached sha when we have one; no cached sha just means create
+        // (true on the first push of a file). No live re-GET, no retry — a sha
+        // is never expected to go stale mid-put.
         var params = {
           message: "",
           content: encode(data)
         };
+        if (branch) params.branch = branch;
         if (overwrite && shaCache.has(file)) {
           params.sha = shaCache.get(file);
         }
-        var args = {
-          method: "PUT",
-          path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file),
-          contentType: "application/json",
-          body: JSON.stringify(params)
-        };
-        var retried = false;
-        var result;
-        while (!result) {
-          try {
-            result = yield requestAPI(args);
-          } catch (err) {
-            if (err.code !== 422 || !err.message.includes("\\\"sha\\\" wasn't supplied")) {
-              throw err;
-            }
-            if (!overwrite || retried) {
-              err.code = "EEXIST";
-              throw err;
-            }
-            yield get(file);
+        try {
+          var result = yield requestAPI({
+            method: "PUT",
+            path: contentsPath(file),
+            contentType: "application/json",
+            body: JSON.stringify(params)
+          });
+          // Only recorded once the write actually succeeded.
+          shaCache.set(file, result.content.sha);
+        } catch (err) {
+          if (!overwrite && (err.code === 422 || err.code === 409)) {
+            // 422/409 on a no-sha write means the file already exists.
+            err.code = "EEXIST";
           }
-          retried = true;
+          throw err;
         }
-        shaCache.set(file, result.content.sha);
       });
       return _put.apply(this, arguments);
     }
@@ -1094,22 +1129,26 @@ var dbToCloud = (function (exports) {
         try {
           var sha = shaCache.get(file);
           if (!sha) {
+            // Not cached: fetch it once. Not a retry loop.
             yield get(file);
             sha = shaCache.get(file);
           }
           yield requestAPI({
             method: "DELETE",
-            path: "/repos/".concat(owner, "/").concat(repo, "/contents/").concat(file),
-            body: JSON.stringify({
+            path: contentsPath(file),
+            contentType: "application/json",
+            body: JSON.stringify(_objectSpread2({
               message: "",
               sha
-            })
+            }, branch ? {
+              branch
+            } : {}))
           });
+          shaCache.delete(file);
         } catch (err) {
           if (err.code === 404) {
             return;
           }
-          // FIXME: do we have to handle 422 errors?
           throw err;
         }
       });
