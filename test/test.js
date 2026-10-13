@@ -28,7 +28,7 @@ async function suite(t, prepare) {
       bar: "baz"
     }
   };
-  const {sync, options, drive} = prepare(data);
+  const {sync, options, drive} = prepare({data});
   
   assert(!sync.isInit());
   
@@ -112,7 +112,7 @@ async function suite(t, prepare) {
   assert(drive.name);
   assert.equal(options.getState.lastCall.args[0].name, drive.name);
 
-  const {sync: sync2, data: data2, options: options2} = prepare({}, {retryMaxAttempts: 0});
+  const {sync: sync2, data: data2, options: options2} = prepare({data: {}, driveOptions: {retryMaxAttempts: 0}});
 
   t.log("start and sync with the second instance");
 
@@ -208,7 +208,9 @@ async function suite(t, prepare) {
 
   t.log("put after a reboot");
 
-  const {sync: sync3} = prepare(data, {}, options.getState());
+  await sync.uninit();
+
+  const {sync: sync3} = prepare({data, state: options.getState()});
   await sync3.init();
   data[1].foo = "foo again";
   data[1]._rev++;
@@ -233,7 +235,7 @@ for (const adapter of ADAPTERS) {
         await adapter.before();
       }
       const getDrive = adapter.get.bind(adapter);
-      await suite(t, (...args) => prepare(getDrive, ...args));
+      await suite(t, args => prepare({getDrive, ...args}));
     } finally {
       if (adapter.after) {
         // FIXME: can adapater.after throw?
@@ -248,7 +250,7 @@ for (const adapter of ADAPTERS) {
   });
 }
   
-function prepare(getDrive, data = {}, driveOptions, state = {}) {
+function prepare({getDrive, data = {}, driveOptions, state = {}}) {
   const compareRevision = sinon.spy((a, b) => a - b);
   const options = {
     fetchDelay: 0,
@@ -274,8 +276,8 @@ function prepare(getDrive, data = {}, driveOptions, state = {}) {
     }),
     onProgress: sinon.spy(),
     compareRevision,
-    getState: sinon.spy(() => state),
-    setState: sinon.spy(newState => {
+    getState: sinon.spy((_drive) => state),
+    setState: sinon.spy((_drive, newState) => {
       state = newState;
     }),
     ...driveOptions
