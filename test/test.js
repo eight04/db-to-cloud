@@ -205,6 +205,19 @@ async function suite(t, prepare) {
   await p;
 
   options.fetchDelay = 0;
+
+  t.log("put after a reboot");
+
+  const {sync: sync3} = prepare(data, {}, options.getState());
+  await sync3.init();
+  data[1].foo = "foo again";
+  data[1]._rev++;
+  sync3.put(1, data[1]._rev);
+  await sync3.syncNow();
+  await sync2.syncNow();
+
+  assert.deepStrictEqual(data2[1], data[1]);
+  assert.equal(data2[1].foo, "foo again");
 }
 
 const instances = [];
@@ -235,7 +248,7 @@ for (const adapter of ADAPTERS) {
   });
 }
   
-function prepare(getDrive, data = {}, driveOptions) {
+function prepare(getDrive, data = {}, driveOptions, state = {}) {
   const compareRevision = sinon.spy((a, b) => a - b);
   const options = {
     fetchDelay: 0,
@@ -261,8 +274,10 @@ function prepare(getDrive, data = {}, driveOptions) {
     }),
     onProgress: sinon.spy(),
     compareRevision,
-    getState: sinon.spy(),
-    setState: sinon.spy(),
+    getState: sinon.spy(() => state),
+    setState: sinon.spy(newState => {
+      state = newState;
+    }),
     ...driveOptions
   };
   const sync = dbToCloud(options);
