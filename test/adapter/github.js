@@ -3,6 +3,7 @@ const fetch = require("make-fetch-happen");
 const {github} = require("../..").drive;
 
 module.exports = {
+  drives: [],
   name: "github",
   valid: () => process.env.GITHUB_ACCESS_TOKEN,
   get() {
@@ -15,14 +16,14 @@ module.exports = {
       getAccessToken: () => ({scheme: "token", param: process.env.GITHUB_ACCESS_TOKEN}),
       fetch
     });
-    if (!this.drive) {
-      this.drive = drive;
-    }
+    this.drives.push(drive);
     return drive;
   },
   async after() {
-    for (const path of this.drive.shaCache.keys()) {
-      await this.drive.delete(path);
+    for (const drive of this.drives) {
+      for (const path of drive.shaCache.keys()) {
+        await drive.delete(path);
+      }
     }
   }
 };
