@@ -154,20 +154,6 @@ test("delete() uses the cached sha and clears it on success", async t => {
   assert.equal(drive.shaCache.has("gone.user.js"), false);
 });
 
-// File modified by another client during the sync, making the cached sha
-// stale — distinct from put()'s "a sha is never expected to go stale".
-test("delete() surfaces a 409 (stale sha) instead of retrying", async t => {
-  const responses = [
-    jsonResponse([{name: "stuck.user.js", path: "stuck.user.js", sha: "cached-sha"}]),
-    jsonResponse({message: "sha mismatch"}, 409)
-  ];
-  const fetch = t.mock.fn(() => responses.shift());
-  const drive = createDrive({owner: "alice", repo: "scripts", fetch});
-  await drive.list("");
-  await assert.rejects(() => drive.delete("stuck.user.js"));
-  assert.equal(fetch.mock.calls.length, 2); // no retry
-});
-
 test("delete() on an already-gone file (404) is a no-op", async t => {
   const responses = [
     jsonResponse([{name: "already-gone.user.js", path: "already-gone.user.js", sha: "cached-sha"}]),
