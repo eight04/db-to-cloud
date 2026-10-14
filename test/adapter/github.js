@@ -22,8 +22,16 @@ module.exports = {
   async after() {
     for (const drive of this.drives) {
       for (const path of drive.shaCache.keys()) {
-        await drive.delete(path);
+        if (validPath(path)) {
+          await drive.delete(path);
+        }
       }
     }
   }
 };
+
+function validPath(path) {
+  // don't delete files not created by this test suite, to avoid deleting important files in the repo
+  // FIXME: now we have to maintain this list of files that are created by the test suite, which is not ideal. We should find a better way to track which files are created by the test suite.
+  return /^(meta\.json|lock\.json|docs\/.*|changes\/.*)$/.test(path);
+}
