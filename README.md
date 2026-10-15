@@ -369,8 +369,8 @@ branch" — this adapter never hardcodes a branch name.
 The repository and branch must already exist — this adapter never creates them.
 
 Two API limits apply, inherited from the underlying endpoint: `list()`
-returns at most 1,000 entries per directory (not paginated), and `get()`
-can only read files up to 1 MB.
+[returns at most 100,000 entries](https://docs.github.com/en/rest/git/trees#get-a-tree) per repo, and `get()`
+can only read files [up to 1 MB](https://docs.github.com/en/rest/repos/contents).
 
 If `fetch` is not supplied, use global variable `fetch`.
 
