@@ -529,6 +529,12 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
+* Next
+
+  - Fix: github adapter doesn't work after a reboot.
+  - Change: use trees API in github adapter.
+  - **Change: `sync.uninit` doesn't set sync state to `null` anymore.**
+
 * 0.9.0 (Oct 5, 2026)
 
   - Add: `apiBase`, `branch` options in github adapter.
