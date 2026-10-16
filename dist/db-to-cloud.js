@@ -330,14 +330,14 @@ var dbToCloud = (function (exports) {
       timer = 0;
       q = null;
     }
-    function defer() {
-      var o = {};
-      o.promise = new Promise((resolve, reject) => {
-        o.resolve = resolve;
-        o.reject = reject;
-      });
-      return o;
-    }
+  }
+  function defer() {
+    var o = {};
+    o.promise = new Promise((resolve, reject) => {
+      o.resolve = resolve;
+      o.reject = reject;
+    });
+    return o;
   }
   function delay(time) {
     return new Promise(resolve => setTimeout(resolve, time));
@@ -548,6 +548,9 @@ var dbToCloud = (function (exports) {
         if (!state || !state.enabled) {
           return;
         }
+        state.enabled = false;
+        // FIXME: is it safe to saveState before drive.uninit? Note that currently drive.uninit is not used by any adapter.
+        yield saveState();
         state = meta = null;
         changeCache.clear();
         revisionCache.clear();
@@ -555,7 +558,6 @@ var dbToCloud = (function (exports) {
           yield _drive2.uninit();
           _drive2.isInit = false;
         }
-        yield saveState();
       }));
     }
     function syncPull() {
@@ -993,6 +995,7 @@ var dbToCloud = (function (exports) {
       cooldown: 1000
     });
     var shaCache = new Map();
+    var shaCacheTs = 0;
     return {
       name: "github",
       get,
@@ -1047,18 +1050,20 @@ var dbToCloud = (function (exports) {
     }
     function _list() {
       _list = _asyncToGenerator(function* (file) {
-        // FIXME: This API has an upper limit of 1,000 files for a directory. If you need to retrieve more files, use the Git Trees API.
-        var result = yield requestAPI({
-          path: contentsPath(file, true)
-        });
+        yield updateShaCache(file);
+        var prefix = file ? "".concat(file, "/") : "";
         var names = [];
-        var _iterator = _createForOfIteratorHelper(result),
+        var _iterator = _createForOfIteratorHelper(shaCache.keys()),
           _step;
         try {
           for (_iterator.s(); !(_step = _iterator.n()).done;) {
-            var item = _step.value;
-            names.push(item.name);
-            shaCache.set(item.path, item.sha);
+            var path = _step.value;
+            if (path.startsWith(prefix)) {
+              var name = path.slice(prefix.length);
+              if (name && !name.includes("/")) {
+                names.push(name);
+              }
+            }
           }
         } catch (err) {
           _iterator.e(err);
@@ -1088,68 +1093,148 @@ var dbToCloud = (function (exports) {
     }
     function _put() {
       _put = _asyncToGenerator(function* (file, data, overwrite = true) {
-        // Uses the cached sha when we have one; no cached sha just means create
-        // (true on the first push of a file). No live re-GET, no retry — a sha
-        // is never expected to go stale mid-put.
         var params = {
           message: "",
           content: encode(data)
         };
+        var path = contentsPath(file);
         if (branch) params.branch = branch;
-        if (overwrite && shaCache.has(file)) {
-          params.sha = shaCache.get(file);
-        }
-        try {
-          var result = yield requestAPI({
-            method: "PUT",
-            path: contentsPath(file),
-            contentType: "application/json",
-            body: JSON.stringify(params)
-          });
-          // Only recorded once the write actually succeeded.
-          shaCache.set(file, result.content.sha);
-        } catch (err) {
-          if (!overwrite && (err.code === 422 || err.code === 409)) {
-            // 422/409 on a no-sha write means the file already exists.
-            err.code = "EEXIST";
+        var retried = 0;
+        while (true) {
+          if (overwrite) {
+            params.sha = shaCache.get(file);
           }
-          throw err;
+          try {
+            var result = yield requestAPI({
+              method: "PUT",
+              path,
+              contentType: "application/json",
+              body: JSON.stringify(params)
+            });
+            // Only recorded once the write actually succeeded.
+            shaCache.set(file, result.content.sha);
+            return;
+          } catch (err) {
+            if (err.code === 422 || err.code === 409) {
+              if (overwrite && retried < 1 && (yield updateShaCache(file))) {
+                retried++;
+                continue;
+              }
+              if (!overwrite) {
+                // 422/409 on a no-sha write means the file already exists.
+                err.code = "EEXIST";
+              }
+            }
+            throw err;
+          }
         }
       });
       return _put.apply(this, arguments);
     }
+    function updateShaCache(_x5) {
+      return _updateShaCache.apply(this, arguments);
+    }
+    function _updateShaCache() {
+      _updateShaCache = _asyncToGenerator(function* (file) {
+        // It makes no sense to refresh the cache too often, something is probably wrong.
+        var COOL_DOWN = 0 * 1000;
+        var now = Date.now();
+        if (now - shaCacheTs < COOL_DOWN) {
+          return false;
+        }
+        shaCacheTs = now;
+        var oldSha = shaCache.get(file);
+        // FIXME: use a lock when accessing the cache or it will break if someone accidentally calls these functions concurrently.
+        // For now, just clear the cache and rebuild it.
+        shaCache.clear();
+
+        // use tree api
+        // FIXME: is it safe to request the entire tree from root? what if the user stores other stuff in the repo?
+        for (var i = 0;; i++) {
+          var result = yield requestAPI({
+            path: "/repos/".concat(owner, "/").concat(repo, "/git/trees/").concat(encodeURIComponent(branch || "HEAD"), "?recursive=1&page=").concat(i + 1)
+          });
+          if (!result.tree) {
+            // gitea seems to return null for empty repo.
+            break;
+          }
+          var _iterator2 = _createForOfIteratorHelper(result.tree),
+            _step2;
+          try {
+            for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
+              var item = _step2.value;
+              if (shaCache.has(item.path)) {
+                throw new Error("Duplicate path in git tree: ".concat(item.path));
+              }
+              shaCache.set(item.path, item.sha);
+            }
+          } catch (err) {
+            _iterator2.e(err);
+          } finally {
+            _iterator2.f();
+          }
+          if (!result.truncated) {
+            break;
+          }
+          if (!result.page) {
+            throw new Error("Git tree is truncated; cannot update sha cache");
+          }
+        }
+        return oldSha !== shaCache.get(file);
+      });
+      return _updateShaCache.apply(this, arguments);
+    }
     function post(file, data) {
       return put(file, data, false);
     }
-    function delete_(_x5) {
+    function delete_(_x6) {
       return _delete_.apply(this, arguments);
     }
     function _delete_() {
       _delete_ = _asyncToGenerator(function* (file) {
-        try {
-          var sha = shaCache.get(file);
+        var path = contentsPath(file);
+        var sha = shaCache.get(file);
+        if (!sha) {
+          yield updateShaCache(file);
+          sha = shaCache.get(file);
           if (!sha) {
-            // Not cached: fetch it once. Not a retry loop.
-            yield get(file);
-            sha = shaCache.get(file);
-          }
-          yield requestAPI({
-            method: "DELETE",
-            path: contentsPath(file),
-            contentType: "application/json",
-            body: JSON.stringify(_objectSpread2({
-              message: "",
-              sha
-            }, branch ? {
-              branch
-            } : {}))
-          });
-          shaCache.delete(file);
-        } catch (err) {
-          if (err.code === 404) {
+            // The file doesn't exist, nothing to delete.
             return;
           }
-          throw err;
+        }
+        var retried = 0;
+        while (true) {
+          try {
+            yield requestAPI({
+              method: "DELETE",
+              path,
+              contentType: "application/json",
+              body: JSON.stringify(_objectSpread2({
+                message: "",
+                sha
+              }, branch ? {
+                branch
+              } : {}))
+            });
+            shaCache.delete(file);
+            return;
+          } catch (err) {
+            if (err.code === 404) {
+              return;
+            }
+            if (retried < 1 && (err.code === 409 || err.code === 422) && (yield updateShaCache(file))) {
+              // NOTE we get 422 error on gitea
+              var newSha = shaCache.get(file);
+              if (!newSha) {
+                // The file doesn't exist, nothing to delete.
+                return;
+              }
+              sha = newSha;
+              retried++;
+              continue;
+            }
+            throw err;
+          }
         }
       });
       return _delete_.apply(this, arguments);
