@@ -3,6 +3,7 @@ const fetch = require("make-fetch-happen");
 const {github} = require("../..").drive;
 
 module.exports = {
+  drives: [],
   name: "github",
   valid: () => process.env.GITHUB_ACCESS_TOKEN,
   get() {
@@ -15,14 +16,22 @@ module.exports = {
       getAccessToken: () => ({scheme: "token", param: process.env.GITHUB_ACCESS_TOKEN}),
       fetch
     });
-    if (!this.drive) {
-      this.drive = drive;
-    }
+    this.drives.push(drive);
     return drive;
   },
   async after() {
-    for (const path of this.drive.shaCache.keys()) {
-      await this.drive.delete(path);
+    for (const drive of this.drives) {
+      for (const path of drive.shaCache.keys()) {
+        if (validPath(path)) {
+          await drive.delete(path);
+        }
+      }
     }
   }
 };
+
+function validPath(path) {
+  // don't delete files not created by this test suite, to avoid deleting important files in the repo
+  // FIXME: now we have to maintain this list of files that are created by the test suite, which is not ideal. We should find a better way to track which files are created by the test suite.
+  return /^(meta\.json|lock\.json|docs\/.*|changes\/.*)$/.test(path);
+}

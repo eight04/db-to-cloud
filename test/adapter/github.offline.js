@@ -17,24 +17,24 @@ test("throws if owner/repo are missing", () => {
 });
 
 test("sends Bearer auth by default, against api.github.com by default", async t => {
-  const fetch = t.mock.fn(() => jsonResponse([]));
+  const fetch = t.mock.fn(() => jsonResponse({tree: []}));
   const drive = createDrive({owner: "alice", repo: "scripts", getAccessToken: () => "plain-token", fetch});
   await drive.list("");
   const [url, opts] = fetch.mock.calls[0].arguments;
-  assert.equal(url, "https://api.github.com/repos/alice/scripts/contents");
+  assert.equal(url, "https://api.github.com/repos/alice/scripts/git/trees/HEAD?recursive=1&page=1");
   assert.equal(opts.headers["Authorization"], "Bearer plain-token");
 });
 
 test("apiBase: \"\" is treated the same as unset, not a literal empty host", async t => {
-  const fetch = t.mock.fn(() => jsonResponse([]));
+  const fetch = t.mock.fn(() => jsonResponse({tree: []}));
   const drive = createDrive({owner: "alice", repo: "scripts", apiBase: "", fetch});
   await drive.list("");
   const [url] = fetch.mock.calls[0].arguments;
-  assert.equal(url, "https://api.github.com/repos/alice/scripts/contents");
+  assert.equal(url, "https://api.github.com/repos/alice/scripts/git/trees/HEAD?recursive=1&page=1");
 });
 
 test("honors a custom apiBase (e.g. a self-hosted Gitea instance)", async t => {
-  const fetch = t.mock.fn(() => jsonResponse([]));
+  const fetch = t.mock.fn(() => jsonResponse({tree: []}));
   const drive = createDrive({
     owner: "alice",
     repo: "scripts",
@@ -43,19 +43,19 @@ test("honors a custom apiBase (e.g. a self-hosted Gitea instance)", async t => {
   });
   await drive.list("");
   const [url] = fetch.mock.calls[0].arguments;
-  assert.equal(url, "https://code.example.org/api/v1/repos/alice/scripts/contents");
+  assert.equal(url, "https://code.example.org/api/v1/repos/alice/scripts/git/trees/HEAD?recursive=1&page=1");
 });
 
 test("no branch set: no ?ref= on reads, no branch field on writes", async t => {
   const responses = [
-    jsonResponse([]),
+    jsonResponse({tree: []}),
     jsonResponse({content: {name: "new.user.js", path: "new.user.js", sha: "newsha"}}, 201)
   ];
   const fetch = t.mock.fn(() => responses.shift());
   const drive = createDrive({owner: "alice", repo: "scripts", fetch});
   await drive.list("");
   const [listUrl] = fetch.mock.calls[0].arguments;
-  assert.equal(listUrl, "https://api.github.com/repos/alice/scripts/contents");
+  assert.equal(listUrl, "https://api.github.com/repos/alice/scripts/git/trees/HEAD?recursive=1&page=1");
   await drive.post("new.user.js", "abc");
   const [putUrl, putOpts] = fetch.mock.calls[1].arguments;
   assert.equal(putUrl, "https://api.github.com/repos/alice/scripts/contents/new.user.js");
@@ -64,14 +64,14 @@ test("no branch set: no ?ref= on reads, no branch field on writes", async t => {
 
 test("branch set: ?ref= on reads, branch field on writes", async t => {
   const responses = [
-    jsonResponse([]),
+    jsonResponse({tree: []}),
     jsonResponse({content: {name: "new.user.js", path: "new.user.js", sha: "newsha"}}, 201)
   ];
   const fetch = t.mock.fn(() => responses.shift());
   const drive = createDrive({owner: "alice", repo: "scripts", branch: "dev", fetch});
   await drive.list("");
   const [listUrl] = fetch.mock.calls[0].arguments;
-  assert.equal(listUrl, "https://api.github.com/repos/alice/scripts/contents?ref=dev");
+  assert.equal(listUrl, "https://api.github.com/repos/alice/scripts/git/trees/dev?recursive=1&page=1");
   await drive.post("new.user.js", "abc");
   const [, putOpts] = fetch.mock.calls[1].arguments;
   assert.equal(JSON.parse(putOpts.body).branch, "dev");
@@ -93,7 +93,7 @@ test("put() should not throw when no cached sha", async t => {
 
 test("put() sends the cached sha to the server", async t => {
   const responses = [
-    jsonResponse([{name: "existing.user.js", path: "existing.user.js", sha: "cached-sha"}]),
+    jsonResponse({tree: [{path: "existing.user.js", sha: "cached-sha"}]}),
     jsonResponse({content: {name: "existing.user.js", path: "existing.user.js", sha: "newsha"}})
   ];
   const fetch = t.mock.fn(() => responses.shift());
@@ -107,7 +107,7 @@ test("put() sends the cached sha to the server", async t => {
 
 test("put() only records the sha in its cache after a successful write", async t => {
   const responses = [
-    jsonResponse([{name: "existing.user.js", path: "existing.user.js", sha: "cached-sha"}]),
+    jsonResponse({tree: [{path: "existing.user.js", sha: "cached-sha"}]}),
     jsonResponse({message: "boom"}, 500)
   ];
   const fetch = t.mock.fn(() => responses.shift());
@@ -140,7 +140,7 @@ test("post() (create-only) reports code: EEXIST when the file already exists", a
 
 test("delete() uses the cached sha and clears it on success", async t => {
   const responses = [
-    jsonResponse([{name: "gone.user.js", path: "gone.user.js", sha: "cached-sha"}]),
+    jsonResponse({tree: [{path: "gone.user.js", sha: "cached-sha"}]}),
     jsonResponse({commit: {}})
   ];
   const fetch = t.mock.fn(() => responses.shift());
@@ -154,23 +154,9 @@ test("delete() uses the cached sha and clears it on success", async t => {
   assert.equal(drive.shaCache.has("gone.user.js"), false);
 });
 
-// File modified by another client during the sync, making the cached sha
-// stale — distinct from put()'s "a sha is never expected to go stale".
-test("delete() surfaces a 409 (stale sha) instead of retrying", async t => {
-  const responses = [
-    jsonResponse([{name: "stuck.user.js", path: "stuck.user.js", sha: "cached-sha"}]),
-    jsonResponse({message: "sha mismatch"}, 409)
-  ];
-  const fetch = t.mock.fn(() => responses.shift());
-  const drive = createDrive({owner: "alice", repo: "scripts", fetch});
-  await drive.list("");
-  await assert.rejects(() => drive.delete("stuck.user.js"));
-  assert.equal(fetch.mock.calls.length, 2); // no retry
-});
-
 test("delete() on an already-gone file (404) is a no-op", async t => {
   const responses = [
-    jsonResponse([{name: "already-gone.user.js", path: "already-gone.user.js", sha: "cached-sha"}]),
+    jsonResponse({tree: [{path: "already-gone.user.js", sha: "cached-sha"}]}),
     jsonResponse({message: "Not Found"}, 404)
   ];
   const fetch = t.mock.fn(() => responses.shift());

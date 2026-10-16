@@ -28,7 +28,7 @@ async function suite(t, prepare) {
       bar: "baz"
     }
   };
-  const {sync, options, drive} = prepare(data);
+  const {sync, options, drive} = prepare({data});
   
   assert(!sync.isInit());
   
@@ -112,7 +112,7 @@ async function suite(t, prepare) {
   assert(drive.name);
   assert.equal(options.getState.lastCall.args[0].name, drive.name);
 
-  const {sync: sync2, data: data2, options: options2} = prepare({}, {retryMaxAttempts: 0});
+  const {sync: sync2, data: data2, options: options2} = prepare({data: {}, driveOptions: {retryMaxAttempts: 0}});
 
   t.log("start and sync with the second instance");
 
@@ -205,6 +205,21 @@ async function suite(t, prepare) {
   await p;
 
   options.fetchDelay = 0;
+
+  t.log("put after a reboot");
+
+  await sync.uninit();
+
+  const {sync: sync3} = prepare({data, state: options.getState()});
+  await sync3.init();
+  data[1].foo = "foo again";
+  data[1]._rev++;
+  sync3.put(1, data[1]._rev);
+  await sync3.syncNow();
+  await sync2.syncNow();
+
+  assert.deepStrictEqual(data2[1], data[1]);
+  assert.equal(data2[1].foo, "foo again");
 }
 
 const instances = [];
@@ -220,7 +235,7 @@ for (const adapter of ADAPTERS) {
         await adapter.before();
       }
       const getDrive = adapter.get.bind(adapter);
-      await suite(t, (...args) => prepare(getDrive, ...args));
+      await suite(t, args => prepare({getDrive, ...args}));
     } finally {
       if (adapter.after) {
         // FIXME: can adapater.after throw?
@@ -235,7 +250,7 @@ for (const adapter of ADAPTERS) {
   });
 }
   
-function prepare(getDrive, data = {}, driveOptions) {
+function prepare({getDrive, data = {}, driveOptions, state = {}}) {
   const compareRevision = sinon.spy((a, b) => a - b);
   const options = {
     fetchDelay: 0,
@@ -261,8 +276,10 @@ function prepare(getDrive, data = {}, driveOptions) {
     }),
     onProgress: sinon.spy(),
     compareRevision,
-    getState: sinon.spy(),
-    setState: sinon.spy(),
+    getState: sinon.spy((_drive) => state),
+    setState: sinon.spy((_drive, newState) => {
+      state = newState;
+    }),
     ...driveOptions
   };
   const sync = dbToCloud(options);

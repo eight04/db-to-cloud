@@ -369,8 +369,8 @@ branch" — this adapter never hardcodes a branch name.
 The repository and branch must already exist — this adapter never creates them.
 
 Two API limits apply, inherited from the underlying endpoint: `list()`
-returns at most 1,000 entries per directory (not paginated), and `get()`
-can only read files up to 1 MB.
+[returns at most 100,000 entries](https://docs.github.com/en/rest/git/trees#get-a-tree) per repo, and `get()`
+can only read files [up to 1 MB](https://docs.github.com/en/rest/repos/contents).
 
 If `fetch` is not supplied, use global variable `fetch`.
 
@@ -528,6 +528,12 @@ If your adapter uses an access token, make sure to throw a proper authentication
 
 Changelog
 ---------
+
+* Next
+
+  - Fix: github adapter doesn't work after a reboot.
+  - Change: use trees API in github adapter.
+  - **Change: `sync.uninit` doesn't set sync state to `null` anymore.**
 
 * 0.9.0 (Oct 5, 2026)
 
