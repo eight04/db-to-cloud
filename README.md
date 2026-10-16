@@ -529,7 +529,7 @@ If your adapter uses an access token, make sure to throw a proper authentication
 Changelog
 ---------
 
-* Next
+* 0.9.1 (Oct 16, 2026)
 
   - Fix: github adapter doesn't work after a reboot.
   - Change: use trees API in github adapter.
